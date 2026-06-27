@@ -1,0 +1,75 @@
+{
+  "name": "@enclave/pqc-core",
+  "version": "0.1.0",
+  "description": "NIST-aligned post-quantum cryptography primitives for Enclave product SDKs",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Enclave-Encrypt/enclave-pqc-core"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./registry": {
+      "types": "./dist/registry/suite.d.ts",
+      "import": "./dist/registry/suite.js"
+    },
+    "./encoding": {
+      "types": "./dist/encoding/index.d.ts",
+      "import": "./dist/encoding/index.js"
+    },
+    "./kem": {
+      "types": "./dist/kem/ml-kem768.d.ts",
+      "import": "./dist/kem/ml-kem768.js"
+    },
+    "./sign": {
+      "types": "./dist/sign/ml-dsa65.d.ts",
+      "import": "./dist/sign/ml-dsa65.js"
+    },
+    "./symmetric": {
+      "types": "./dist/symmetric/aes-gcm.d.ts",
+      "import": "./dist/symmetric/aes-gcm.js"
+    },
+    "./hash": {
+      "types": "./dist/hash/shake256.d.ts",
+      "import": "./dist/hash/shake256.js"
+    },
+    "./kdf": {
+      "types": "./dist/kdf/labeled.d.ts",
+      "import": "./dist/kdf/labeled.js"
+    },
+    "./provider": {
+      "types": "./dist/provider/index.d.ts",
+      "import": "./dist/provider/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "ENCLAVE_PQ_SUITE_v1.json",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "tsx --test src/**/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^1.3.0",
+    "@noble/hashes": "^1.8.0",
+    "@noble/post-quantum": "^0.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
