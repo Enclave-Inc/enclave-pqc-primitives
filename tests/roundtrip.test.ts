@@ -5,18 +5,18 @@ import {
   decapsulateMlKem,
   encapsulateMlKem,
   generateMlKemKeypair,
-} from "../kem/ml-kem768.js";
+} from "../src/kem/index.js";
 import {
   generateMlDsaKeypair,
   signMlDsa,
   verifyMlDsa,
-} from "../sign/ml-dsa65.js";
+} from "../src/sign/index.js";
 import {
   decryptBytesWithKey,
   encryptBytesWithKey,
-} from "../symmetric/aes-gcm.js";
-import { labeledKdf } from "../kdf/labeled.js";
-import { ENCLAVE_PQ_SUITE_V1 } from "../registry/suite.js";
+} from "../src/symmetric/index.js";
+import { labeledKdf } from "../src/kdf/index.js";
+import { ENCLAVE_PQ_SUITE_V1 } from "../src/registry/suite.js";
 
 describe("ENCLAVE_PQ_SUITE_v1", () => {
   it("declares NIST-aligned algorithms", () => {
@@ -30,7 +30,10 @@ describe("ML-KEM-768", () => {
   it("round-trips shared secret", () => {
     const recipient = generateMlKemKeypair();
     const encapsulated = encapsulateMlKem(recipient.publicKey);
-    const shared = decapsulateMlKem(encapsulated.cipherText, recipient.secretKey);
+    const shared = decapsulateMlKem(
+      encapsulated.cipherText,
+      recipient.secretKey,
+    );
     assert.deepEqual(shared, encapsulated.sharedSecret);
   });
 });
@@ -38,7 +41,7 @@ describe("ML-KEM-768", () => {
 describe("ML-DSA-65", () => {
   it("signs and verifies", () => {
     const keys = generateMlDsaKeypair();
-    const message = new TextEncoder().encode("enclave-pqc-core");
+    const message = new TextEncoder().encode("enclave-pqc-primitives");
     const signature = signMlDsa(keys.secretKey, message);
     assert.equal(verifyMlDsa(keys.publicKey, message, signature), true);
   });

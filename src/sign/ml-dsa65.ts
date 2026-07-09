@@ -1,6 +1,7 @@
 import { ml_dsa65 } from "@noble/post-quantum/ml-dsa.js";
-import { randomBytes } from "@noble/post-quantum/utils.js";
+import { randomBytes as nobleRandomBytes } from "@noble/post-quantum/utils.js";
 
+import { assertNonEmpty } from "../bytes/index.js";
 import { bytesToBase64Url } from "../encoding/base64.js";
 import { ML_DSA_ALGORITHM } from "../registry/suite.js";
 
@@ -12,7 +13,7 @@ export type MlDsaKeypair = {
 };
 
 export function generateMlDsaKeypair(seed?: Uint8Array): MlDsaKeypair {
-  const keys = ml_dsa65.keygen(seed ?? randomBytes(32));
+  const keys = ml_dsa65.keygen(seed ?? nobleRandomBytes(32));
   return {
     publicKey: keys.publicKey,
     secretKey: keys.secretKey,
@@ -23,6 +24,8 @@ export function signMlDsa(
   secretKey: Uint8Array,
   message: Uint8Array,
 ): Uint8Array {
+  assertNonEmpty(secretKey, "ML-DSA secret key");
+  assertNonEmpty(message, "ML-DSA message");
   return ml_dsa65.sign(message, secretKey);
 }
 
@@ -31,6 +34,9 @@ export function verifyMlDsa(
   message: Uint8Array,
   signature: Uint8Array,
 ): boolean {
+  assertNonEmpty(publicKey, "ML-DSA public key");
+  assertNonEmpty(message, "ML-DSA message");
+  assertNonEmpty(signature, "ML-DSA signature");
   return ml_dsa65.verify(signature, message, publicKey);
 }
 

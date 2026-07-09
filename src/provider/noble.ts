@@ -36,6 +36,7 @@ export const noblePqcProvider: PqcProvider = {
     encrypt: encryptAesGcmBytes,
     decrypt: decryptAesGcmBytes,
     encryptWithKey: encryptBytesWithKey,
+    decryptWithKey: decryptBytesWithKey,
   },
   hash: {
     shake256: shake256Bytes,
@@ -56,5 +57,3 @@ export function getDefaultPqcProvider(): PqcProvider {
 export function setDefaultPqcProvider(provider: PqcProvider): void {
   defaultProvider = provider;
 }
-
-export { decryptBytesWithKey };

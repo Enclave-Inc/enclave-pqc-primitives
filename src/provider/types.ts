@@ -1,5 +1,6 @@
 import type {
   decryptAesGcmBytes,
+  decryptBytesWithKey,
   encryptAesGcmBytes,
   encryptBytesWithKey,
 } from "../symmetric/aes-gcm.js";
@@ -35,6 +36,7 @@ export type PqcProvider = {
     encrypt: typeof encryptAesGcmBytes;
     decrypt: typeof decryptAesGcmBytes;
     encryptWithKey: typeof encryptBytesWithKey;
+    decryptWithKey: typeof decryptBytesWithKey;
   };
   hash: {
     shake256: typeof shake256Bytes;

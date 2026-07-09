@@ -1,0 +1,15 @@
+---
+description: Core standards for enclave-pqc-primitives
+alwaysApply: true
+---
+
+# enclave-pqc-primitives standards
+
+- Keep changes minimal and focused. No unrelated refactors.
+- One module per primitive family: `kem/`, `sign/`, `symmetric/`, `hash/`, `kdf/`, `encoding/`.
+- Product SDKs must not import `@noble/*` directly — only this package.
+- Algorithm IDs come from `registry/ENCLAVE_PQ_SUITE_v1.json`, not hardcoded strings.
+- Validate inputs at public API boundaries (key lengths, empty buffers, malformed encodings).
+- Tests live in `tests/`, not under `src/`.
+- Barrel `index.ts` files own public exports; implementation files stay private to their folder.
+- No god files. Keep files under ~120 lines when practical.

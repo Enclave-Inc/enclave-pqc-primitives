@@ -1,5 +1,10 @@
 import { gcm } from "@noble/ciphers/aes.js";
 
+import {
+  assertByteLength,
+  randomBytes,
+  toArrayBuffer,
+} from "../bytes/index.js";
 import { base64ToBytes, bytesToBase64 } from "../encoding/base64.js";
 import { AES_GCM_ALGORITHM } from "../registry/suite.js";
 
@@ -13,18 +18,6 @@ type AesGcmAlgorithmParams = {
   iv: ArrayBuffer;
   additionalData?: ArrayBuffer;
 };
-
-function randomBytes(length: number): Uint8Array {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  return bytes;
-}
-
-function toArrayBuffer(value: Uint8Array): ArrayBuffer {
-  const copy = new Uint8Array(value.byteLength);
-  copy.set(value);
-  return copy.buffer;
-}
 
 export type AesGcmEncryptResult = {
   ciphertext: Uint8Array;
@@ -47,12 +40,8 @@ export async function encryptAesGcmBytes(input: {
       ? base64ToBytes(input.ivBase64)
       : randomBytes(AES_GCM_IV_BYTES);
 
-  if (keyBytes.length !== AES_GCM_KEY_BYTES) {
-    throw new Error(`AES-256-GCM requires a ${AES_GCM_KEY_BYTES}-byte key`);
-  }
-  if (iv.length !== AES_GCM_IV_BYTES) {
-    throw new Error(`AES-256-GCM requires a ${AES_GCM_IV_BYTES}-byte IV`);
-  }
+  assertByteLength(keyBytes, AES_GCM_KEY_BYTES, "AES-256-GCM key");
+  assertByteLength(iv, AES_GCM_IV_BYTES, "AES-256-GCM IV");
 
   if (crypto.subtle) {
     const encryptParams: AesGcmAlgorithmParams = {
@@ -103,6 +92,9 @@ export async function decryptAesGcmBytes(input: {
   const keyBytes = base64ToBytes(input.keyBase64);
   const iv = base64ToBytes(input.ivBase64);
 
+  assertByteLength(keyBytes, AES_GCM_KEY_BYTES, "AES-256-GCM key");
+  assertByteLength(iv, AES_GCM_IV_BYTES, "AES-256-GCM IV");
+
   if (crypto.subtle) {
     const decryptParams: AesGcmAlgorithmParams = {
       name: "AES-GCM",
@@ -140,6 +132,8 @@ export async function encryptBytesWithKey(input: {
   key: Uint8Array;
   additionalData?: Uint8Array;
 }): Promise<{ ciphertext: Uint8Array; ivBase64: string }> {
+  assertByteLength(input.key, AES_GCM_KEY_BYTES, "AES-256-GCM key");
+
   const result = await encryptAesGcmBytes({
     plaintext: input.plaintext,
     keyBase64: bytesToBase64(input.key),
@@ -158,6 +152,8 @@ export async function decryptBytesWithKey(input: {
   ivBase64: string;
   additionalData?: Uint8Array;
 }): Promise<Uint8Array> {
+  assertByteLength(input.key, AES_GCM_KEY_BYTES, "AES-256-GCM key");
+
   return decryptAesGcmBytes({
     ciphertext: input.ciphertext,
     keyBase64: bytesToBase64(input.key),
