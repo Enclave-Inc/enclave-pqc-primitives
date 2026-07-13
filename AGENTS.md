@@ -35,5 +35,5 @@ npm run build
 
 ## Consumers
 
-`@enclave/sign-sdk`, `@enclave/verify-sdk`, `@enclave/social-sdk` depend on this package.
+`@enclave/sign-sdk`, `@enclave/verify-sdk`, `@enclave/messaging-sdk` depend on this package.
 They reference it via `file:../../Enclave-Inc/enclave-pqc-primitives` in local dev.

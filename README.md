@@ -80,7 +80,7 @@ npm run build
 |-------------|-------------------------|
 | `@enclave/sign-sdk` | Document DEK wrap (ML-KEM), manifest signatures (ML-DSA), AES-GCM |
 | `@enclave/verify-sdk` | Credential signatures (ML-DSA), Merkle hashes (SHAKE256) |
-| `@enclave/social-sdk` | Message epochs, sidechains, attachments, call keys |
+| `@enclave/messaging-sdk` | Message epochs, sidechains, attachments, call keys |
 
 **Rule:** no product repo or API handler imports low-level PQ libraries directly — only `@enclave/pqc-primitives` (via the product SDK).
 
