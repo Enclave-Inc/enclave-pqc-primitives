@@ -1,7 +1,7 @@
 # enclave-pqc-primitives
 
 NIST-aligned **post-quantum cryptographic primitives** for Enclave product
-SDKs. Licensed under **AGPL-3.0-or-later**.
+SDKs. Licensed under **Apache-2.0**.
 
 This is the foundational (tier-1) crate. Product SDKs (Sign, Verify, Messaging,
 Encrypt) and applications build **on top of** it in separate layers.
@@ -124,7 +124,6 @@ sig::verify(&sig_kp.public_key, b"message", &signature)?;
 # Ok::<(), enclave_pqc_primitives::Error>(())
 ```
 
-## Commercial licensing
+## License
 
-AGPL-3.0 applies. Contact Enclave for commercial licensing if you need to use
-this crate in proprietary software without AGPL obligations.
+Licensed under the [Apache License, Version 2.0](./LICENSE).
