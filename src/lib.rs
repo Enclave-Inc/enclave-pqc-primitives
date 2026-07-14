@@ -1,15 +1,18 @@
-//! `enclave-pqc-primitives` — NIST-aligned post-quantum primitives.
+//! `enclave-pqc-primitives` — NIST Category 5 post-quantum primitives.
 //!
-//! Foundational cryptography for Enclave product SDKs (Sign, Verify, Messaging,
-//! Encrypt). This crate deliberately contains **primitives only** — no product
-//! protocols, ceremonies, credential formats, or SDK façades.
+//! Foundational cryptography for Enclave product SDKs (Auth, Sign, Verify,
+//! Messaging, Encrypt). This crate deliberately contains **primitives only** —
+//! no product protocols, ceremonies, credential formats, or SDK façades.
 //!
 //! # Algorithm suite (`ENCLAVE_PQ_SUITE_v1`)
 //!
+//! This crate implements **NIST Category 5 exclusively** (ML-KEM-1024 /
+//! ML-DSA-87). There is no Category 3 parameter set and no suite-selection API.
+//!
 //! | Role | Algorithm | Standard |
 //! |------|-----------|----------|
-//! | KEM | ML-KEM-768 | FIPS 203 |
-//! | Signatures | ML-DSA-65 | FIPS 204 |
+//! | KEM | ML-KEM-1024 | FIPS 203 |
+//! | Signatures | ML-DSA-87 | FIPS 204 |
 //! | Symmetric AEAD | AES-256-GCM | FIPS 197 / SP 800-38D |
 //! | Hash / KDF | SHAKE256 / `enclave-kdf-v1` | FIPS 202 |
 //!
@@ -18,11 +21,14 @@
 //!
 //! # Modules
 //!
-//! - [`kem`] — ML-KEM-768 key encapsulation
-//! - [`sig`] — ML-DSA-65 signatures
+//! - [`kem`] — ML-KEM-1024 key encapsulation
+//! - [`sig`] — ML-DSA-87 signatures
 //! - [`aead`] — AES-256-GCM with explicit nonces
 //! - [`hash`] — SHAKE256 one-shot and XOF
 //! - [`kdf`] — labeled `enclave-kdf-v1` KDF
+//! - [`provider`] — [`CryptoProvider`] seam + [`SoftwareProvider`]
+//! - [`self_test`] — CAST known-answer self-tests
+//! - [`usage`] — CBOM-oriented [`CryptoUsageRecord`]
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
@@ -33,9 +39,15 @@ pub mod error;
 pub mod hash;
 pub mod kdf;
 pub mod kem;
+pub mod provider;
+pub mod self_test;
 pub mod sig;
+pub mod usage;
 
-pub use error::{Error, Result};
+pub use error::{Error, Result, SelfTestError};
+pub use provider::{CryptoProvider, SoftwareProvider};
+pub use self_test::run_self_tests;
+pub use usage::{CryptoUsageRecord, CRATE_VERSION};
 
-/// Canonical suite identifier matching the historical TypeScript registry.
+/// Canonical suite identifier. Algorithms under this id are Category 5 only.
 pub const ENCLAVE_PQ_SUITE_ID: &str = "ENCLAVE_PQ_SUITE_v1";

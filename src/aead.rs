@@ -8,6 +8,7 @@ use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+use crate::usage::CryptoUsageRecord;
 use crate::{Error, Result};
 
 type AesNonce = Nonce<U12>;
@@ -32,6 +33,28 @@ pub const TAG_BYTES: usize = 16;
 pub struct EncryptResult {
     /// Ciphertext || tag.
     pub ciphertext: Vec<u8>,
+}
+
+/// Encryption result plus CBOM usage metadata.
+#[derive(Clone, Debug)]
+pub struct EncryptOutput {
+    /// Ciphertext || tag.
+    pub result: EncryptResult,
+    /// Algorithm / suite / crate metadata for this operation.
+    pub usage: CryptoUsageRecord,
+}
+
+/// Decryption result plus CBOM usage metadata.
+#[derive(Clone, Debug)]
+pub struct DecryptOutput {
+    /// Recovered plaintext.
+    pub plaintext: Vec<u8>,
+    /// Algorithm / suite / crate metadata for this operation.
+    pub usage: CryptoUsageRecord,
+}
+
+fn usage(operation: &'static str) -> CryptoUsageRecord {
+    CryptoUsageRecord::new(ALGORITHM, operation)
 }
 
 fn cipher_from_key(key: &[u8]) -> Result<Aes256Gcm> {
@@ -69,7 +92,7 @@ fn nonce_from_slice(nonce: &[u8]) -> Result<&AesNonce> {
 ///
 /// Returns [`Error::InvalidLength`] for wrong key/nonce sizes, or
 /// [`Error::AeadFailure`] if the underlying cipher reports an error.
-pub fn encrypt(key: &[u8], nonce: &[u8], plaintext: &[u8], aad: &[u8]) -> Result<EncryptResult> {
+pub fn encrypt(key: &[u8], nonce: &[u8], plaintext: &[u8], aad: &[u8]) -> Result<EncryptOutput> {
     let cipher = cipher_from_key(key)?;
     let nonce = nonce_from_slice(nonce)?;
     let ciphertext = cipher
@@ -81,7 +104,10 @@ pub fn encrypt(key: &[u8], nonce: &[u8], plaintext: &[u8], aad: &[u8]) -> Result
             },
         )
         .map_err(|_| Error::AeadFailure)?;
-    Ok(EncryptResult { ciphertext })
+    Ok(EncryptOutput {
+        result: EncryptResult { ciphertext },
+        usage: usage("aead_encrypt"),
+    })
 }
 
 /// Decrypt AES-256-GCM ciphertext (including the trailing tag) under an
@@ -101,13 +127,18 @@ pub fn encrypt(key: &[u8], nonce: &[u8], plaintext: &[u8], aad: &[u8]) -> Result
 /// # Errors
 ///
 /// Returns [`Error::InvalidLength`] or [`Error::AeadFailure`].
-pub fn decrypt(key: &[u8], nonce: &[u8], ciphertext: &[u8], aad: &[u8]) -> Result<Vec<u8>> {
+pub fn decrypt(
+    key: &[u8],
+    nonce: &[u8],
+    ciphertext: &[u8],
+    aad: &[u8],
+) -> Result<DecryptOutput> {
     if ciphertext.len() < TAG_BYTES {
         return Err(Error::InvalidLength);
     }
     let cipher = cipher_from_key(key)?;
     let nonce = nonce_from_slice(nonce)?;
-    cipher
+    let plaintext = cipher
         .decrypt(
             nonce,
             Payload {
@@ -115,7 +146,11 @@ pub fn decrypt(key: &[u8], nonce: &[u8], ciphertext: &[u8], aad: &[u8]) -> Resul
                 aad,
             },
         )
-        .map_err(|_| Error::AeadFailure)
+        .map_err(|_| Error::AeadFailure)?;
+    Ok(DecryptOutput {
+        plaintext,
+        usage: usage("aead_decrypt"),
+    })
 }
 
 /// Convenience helper that validates a key length without allocating a cipher.
@@ -145,9 +180,10 @@ mod tests {
         let aad = b"header";
 
         let enc = encrypt(&key, &nonce, plaintext, aad).expect("encrypt");
-        let dec = decrypt(&key, &nonce, &enc.ciphertext, aad).expect("decrypt");
-        assert_eq!(dec, plaintext);
-        assert!(decrypt(&key, &nonce, &enc.ciphertext, b"other").is_err());
+        let dec = decrypt(&key, &nonce, &enc.result.ciphertext, aad).expect("decrypt");
+        assert_eq!(dec.plaintext, plaintext);
+        assert_eq!(enc.usage.algorithm, ALGORITHM);
+        assert!(decrypt(&key, &nonce, &enc.result.ciphertext, b"other").is_err());
     }
 
     #[test]

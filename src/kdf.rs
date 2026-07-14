@@ -3,7 +3,8 @@
 //! Matches the TypeScript `@enclave/pqc-primitives` construction so Rust and JS
 //! SDKs derive identical key material from the same inputs.
 
-use crate::hash::shake256;
+use crate::hash::shake256_raw;
+use crate::usage::CryptoUsageRecord;
 
 /// Domain-separation prefix for the Enclave labeled KDF.
 ///
@@ -13,6 +14,22 @@ pub const KDF_LABEL_PREFIX: &str = "enclave-kdf-v1";
 
 /// Default derived-key length in bytes.
 pub const DEFAULT_OUTPUT_BYTES: usize = 32;
+
+/// Algorithm identifier for CBOM / usage records.
+pub const ALGORITHM: &str = "enclave-kdf-v1";
+
+/// KDF output plus CBOM usage metadata.
+#[derive(Clone, Debug)]
+pub struct KdfOutput {
+    /// Derived key material.
+    pub key: Vec<u8>,
+    /// Algorithm / suite / crate metadata for this operation.
+    pub usage: CryptoUsageRecord,
+}
+
+fn usage(operation: &'static str) -> CryptoUsageRecord {
+    CryptoUsageRecord::new(ALGORITHM, operation)
+}
 
 /// Derive key material with the `enclave-kdf-v1` labeled SHAKE256 construction.
 ///
@@ -45,7 +62,7 @@ pub const DEFAULT_OUTPUT_BYTES: usize = 32;
 ///
 /// Returns [`crate::Error::InvalidParameter`] when `length` is zero or `label`
 /// is empty.
-pub fn labeled_kdf(label: &str, ikm: &[u8], length: usize) -> crate::Result<Vec<u8>> {
+pub fn labeled_kdf(label: &str, ikm: &[u8], length: usize) -> crate::Result<KdfOutput> {
     if label.is_empty() || length == 0 {
         return Err(crate::Error::InvalidParameter);
     }
@@ -55,11 +72,14 @@ pub fn labeled_kdf(label: &str, ikm: &[u8], length: usize) -> crate::Result<Vec<
     material.extend_from_slice(label.as_bytes());
     material.push(b':');
     material.extend_from_slice(ikm);
-    Ok(shake256(&material, length))
+    Ok(KdfOutput {
+        key: shake256_raw(&material, length),
+        usage: usage("kdf"),
+    })
 }
 
 /// [`labeled_kdf`] with [`DEFAULT_OUTPUT_BYTES`] (32).
-pub fn labeled_kdf_32(label: &str, ikm: &[u8]) -> crate::Result<Vec<u8>> {
+pub fn labeled_kdf_32(label: &str, ikm: &[u8]) -> crate::Result<KdfOutput> {
     labeled_kdf(label, ikm, DEFAULT_OUTPUT_BYTES)
 }
 
@@ -71,16 +91,17 @@ mod tests {
     fn matches_known_vector_shape() {
         // Domain bytes for label "test" must start with ASCII enclave-kdf-v1:test:
         let out = labeled_kdf("test", b"ikm", 32).unwrap();
-        assert_eq!(out.len(), 32);
+        assert_eq!(out.key.len(), 32);
         let again = labeled_kdf("test", b"ikm", 32).unwrap();
-        assert_eq!(out, again);
-        assert_ne!(out, labeled_kdf("other", b"ikm", 32).unwrap());
+        assert_eq!(out.key, again.key);
+        assert_ne!(out.key, labeled_kdf("other", b"ikm", 32).unwrap().key);
+        assert_eq!(out.usage.algorithm, ALGORITHM);
     }
 
     #[test]
     fn longer_output_extends_prefix() {
         let short = labeled_kdf("x", b"y", 16).unwrap();
         let long = labeled_kdf("x", b"y", 48).unwrap();
-        assert_eq!(short, long[..16]);
+        assert_eq!(short.key, long.key[..16]);
     }
 }

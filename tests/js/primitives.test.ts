@@ -1,0 +1,152 @@
+import { describe, expect, it } from "vitest";
+import {
+  AEAD,
+  HASH,
+  KDF_LABEL_PREFIX,
+  KEM,
+  SIG,
+  aeadDecrypt,
+  aeadEncrypt,
+  getLastUsageRecord,
+  hashUtf8,
+  isSelfTestFailure,
+  kemDecapsulate,
+  kemEncapsulate,
+  kemExpandedSecretKey,
+  kemGenerateKeypair,
+  labeledKdf,
+  labeledKdf32,
+  runSelfTests,
+  shake256,
+  sigGenerateKeypair,
+  sigSign,
+  sigSignWithContext,
+  sigVerify,
+  sigVerifyWithContext,
+  zeroize,
+} from "@enclave/pqc-primitives";
+
+describe("@enclave/pqc-primitives wasm bindings (Category 5)", () => {
+  it("exports Category 5 suite size constants", () => {
+    expect(KEM.ALGORITHM).toBe("ML-KEM-1024");
+    expect(KEM.PUBLIC_KEY_BYTES).toBe(1568);
+    expect(KEM.SECRET_KEY_BYTES).toBe(3168);
+    expect(KEM.CIPHERTEXT_BYTES).toBe(1568);
+    expect(SIG.ALGORITHM).toBe("ML-DSA-87");
+    expect(SIG.PUBLIC_KEY_BYTES).toBe(2592);
+    expect(SIG.SECRET_KEY_BYTES).toBe(4896);
+    expect(SIG.SIGNATURE_BYTES).toBe(4627);
+    expect(AEAD.NONCE_BYTES).toBe(12);
+    expect(HASH.DEFAULT_OUTPUT_BYTES).toBe(32);
+    expect(KDF_LABEL_PREFIX).toBe("enclave-kdf-v1");
+  });
+
+  it("passes CAST self-tests", async () => {
+    await expect(runSelfTests()).resolves.toBeUndefined();
+  });
+
+  it("round-trips ML-DSA-87 sign/verify", () => {
+    const kp = sigGenerateKeypair();
+    expect(kp.publicKey.length).toBe(SIG.PUBLIC_KEY_BYTES);
+    expect(kp.secretKey.length).toBe(SIG.SECRET_KEY_SEED_BYTES);
+    const message = new TextEncoder().encode("challenge");
+    const signature = sigSign(kp.secretKey, message);
+    expect(signature.length).toBe(SIG.SIGNATURE_BYTES);
+    expect(sigVerify(kp.publicKey, message, signature)).toBe(true);
+    expect(sigVerify(kp.publicKey, new TextEncoder().encode("other"), signature)).toBe(
+      false,
+    );
+    const usage = getLastUsageRecord();
+    expect(usage?.algorithm).toBe("ML-DSA-87");
+    expect(usage?.suiteId).toBe("ENCLAVE_PQ_SUITE_v1");
+    zeroize(kp.secretKey);
+  });
+
+  it("sigSignWithContext rejects empty message and oversized context", () => {
+    const kp = sigGenerateKeypair();
+    const empty = new Uint8Array();
+    expect(() => sigSignWithContext(kp.secretKey, empty, empty)).toThrow(/InvalidLength/);
+    const oversized = new Uint8Array(SIG.MAX_CONTEXT_BYTES + 1);
+    expect(() =>
+      sigSignWithContext(kp.secretKey, new TextEncoder().encode("x"), oversized),
+    ).toThrow(/InvalidParameter/);
+    const ctx = new TextEncoder().encode("domain");
+    const sig = sigSignWithContext(kp.secretKey, new TextEncoder().encode("x"), ctx);
+    expect(sigVerifyWithContext(kp.publicKey, new TextEncoder().encode("x"), sig, ctx)).toBe(
+      true,
+    );
+    zeroize(kp.secretKey);
+  });
+
+  it("round-trips ML-KEM-1024 encapsulate/decapsulate", () => {
+    const kp = kemGenerateKeypair();
+    expect(kp.publicKey.length).toBe(KEM.PUBLIC_KEY_BYTES);
+    expect(kp.secretKey.length).toBe(KEM.SECRET_KEY_SEED_BYTES);
+    const expanded = kemExpandedSecretKey(kp.secretKey);
+    expect(expanded.length).toBe(KEM.SECRET_KEY_BYTES);
+    const enc = kemEncapsulate(kp.publicKey);
+    expect(enc.ciphertext.length).toBe(KEM.CIPHERTEXT_BYTES);
+    expect(enc.sharedSecret.length).toBe(KEM.SHARED_SECRET_BYTES);
+    const shared = kemDecapsulate(enc.ciphertext, kp.secretKey);
+    expect(Buffer.from(shared)).toEqual(Buffer.from(enc.sharedSecret));
+    const usage = getLastUsageRecord();
+    expect(usage?.algorithm).toBe("ML-KEM-1024");
+    zeroize(kp.secretKey);
+    zeroize(enc.sharedSecret);
+    zeroize(expanded);
+  });
+
+  it("round-trips AES-256-GCM encrypt/decrypt", () => {
+    const key = labeledKdf32("aes-256-gcm-key", new Uint8Array(32).fill(7));
+    const nonce = new Uint8Array(AEAD.NONCE_BYTES).fill(9);
+    const plaintext = new TextEncoder().encode("hello aead");
+    const aad = new TextEncoder().encode("hdr");
+    const sealed = aeadEncrypt(key, nonce, plaintext, aad);
+    expect(sealed.length).toBe(plaintext.length + AEAD.TAG_BYTES);
+    const opened = aeadDecrypt(key, nonce, sealed, aad);
+    expect(new TextDecoder().decode(opened)).toBe("hello aead");
+    expect(() => aeadDecrypt(key, nonce, sealed, new TextEncoder().encode("bad"))).toThrow(
+      /AeadFailure/,
+    );
+    zeroize(key);
+  });
+
+  it("rejects wrong AEAD key/nonce lengths without truncating", () => {
+    const plaintext = new Uint8Array([1, 2, 3]);
+    expect(() =>
+      aeadEncrypt(new Uint8Array(16), new Uint8Array(12), plaintext, new Uint8Array()),
+    ).toThrow(/InvalidLength/);
+    expect(() =>
+      aeadEncrypt(new Uint8Array(32), new Uint8Array(8), plaintext, new Uint8Array()),
+    ).toThrow(/InvalidLength/);
+  });
+
+  it("labeledKdf is deterministic and rejects empty label", () => {
+    const ikm = new Uint8Array([1, 2, 3, 4]);
+    const a = labeledKdf("test", ikm, 32);
+    const b = labeledKdf("test", ikm, 32);
+    expect(Buffer.from(a)).toEqual(Buffer.from(b));
+    expect(labeledKdf("test", ikm, 16)).toEqual(a.subarray(0, 16));
+    expect(() => labeledKdf("", ikm, 32)).toThrow(/InvalidParameter/);
+    expect(() => labeledKdf("x", ikm, 0)).toThrow(/InvalidParameter/);
+  });
+
+  it("shake256 / hashUtf8 produce fixed-length digests", () => {
+    const dig = shake256(new TextEncoder().encode("abc"), 32);
+    expect(dig.length).toBe(32);
+    expect(hashUtf8("abc", 32)).toEqual(dig);
+  });
+
+  it("zeroize clears the buffer in place", () => {
+    const buf = new Uint8Array([1, 2, 3, 4]);
+    zeroize(buf);
+    expect(Array.from(buf)).toEqual([0, 0, 0, 0]);
+  });
+
+  it("isSelfTestFailure recognizes typed errors", () => {
+    const err = new Error("SelfTestFailure: demo");
+    err.name = "SelfTestFailureError";
+    expect(isSelfTestFailure(err)).toBe(true);
+    expect(isSelfTestFailure(new Error("nope"))).toBe(false);
+  });
+});

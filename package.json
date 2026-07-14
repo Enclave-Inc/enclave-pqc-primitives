@@ -1,0 +1,61 @@
+{
+  "name": "@enclave/pqc-primitives",
+  "version": "0.1.0",
+  "description": "NIST Category 5 post-quantum primitives (ML-KEM-1024, ML-DSA-87, AES-256-GCM, SHAKE256) via WASM — algorithm API only",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Enclave-Inc/enclave-pqc-primitives"
+  },
+  "files": [
+    "dist/**",
+    "js/**",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/nodejs/index.d.ts",
+      "browser": "./dist/bundler/index.js",
+      "deno": "./dist/web/index.js",
+      "node": "./dist/nodejs/index.js",
+      "import": "./dist/nodejs/index.js",
+      "default": "./dist/nodejs/index.js"
+    },
+    "./bundler": {
+      "types": "./dist/bundler/index.d.ts",
+      "import": "./dist/bundler/index.js",
+      "default": "./dist/bundler/index.js"
+    },
+    "./web": {
+      "types": "./dist/web/index.d.ts",
+      "import": "./dist/web/index.js",
+      "default": "./dist/web/index.js"
+    },
+    "./node": {
+      "types": "./dist/nodejs/index.d.ts",
+      "import": "./dist/nodejs/index.js",
+      "default": "./dist/nodejs/index.js"
+    }
+  },
+  "types": "./dist/nodejs/index.d.ts",
+  "main": "./dist/nodejs/index.js",
+  "module": "./dist/nodejs/index.js",
+  "sideEffects": false,
+  "scripts": {
+    "build": "node scripts/build-wasm.mjs",
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "test": "npm run build && vitest run",
+    "test:watch": "vitest",
+    "typecheck:rust": "cargo test --workspace --no-run",
+    "clippy": "cargo clippy --workspace --all-targets -- -D warnings"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

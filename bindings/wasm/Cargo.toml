@@ -1,0 +1,24 @@
+[package]
+name = "enclave-pqc-primitives-wasm"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "wasm-bindgen bindings for enclave-pqc-primitives (algorithm-only)"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+enclave-pqc-primitives = { path = "../.." }
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+
+# CSPRNG for KeyGen under wasm32 (see ../../.cargo/config.toml).
+getrandom = { version = "0.2", features = ["js"] }
+getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

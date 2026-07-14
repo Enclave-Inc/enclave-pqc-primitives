@@ -1,0 +1,378 @@
+#!/usr/bin/env node
+/**
+ * Build WASM bindings for bundler / nodejs / web targets, then emit JS façades.
+ */
+import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const wasmCrate = join(root, "bindings", "wasm");
+const targets = [
+  { name: "bundler", out: join(root, "dist", "bundler") },
+  { name: "nodejs", out: join(root, "dist", "nodejs") },
+  { name: "web", out: join(root, "dist", "web") },
+];
+
+function run(cmd, args) {
+  console.log(`> ${cmd} ${args.join(" ")}`);
+  // Do not use `shell: true` on Windows: paths under
+  // `Enclave Technologies Inc\...` get truncated at the first space.
+  const result = spawnSync(cmd, args, {
+    cwd: root,
+    stdio: "inherit",
+    shell: false,
+  });
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+}
+
+function ensureWasmPack() {
+  const check = spawnSync("wasm-pack", ["--version"], {
+    // version check has no path args; shell is fine for PATH lookup of .cmd
+    shell: process.platform === "win32",
+  });
+  if (check.status !== 0) {
+    console.log("Installing wasm-pack…");
+    run("cargo", ["install", "wasm-pack"]);
+  }
+}
+
+// Sizes must match Rust `kem::*` / `sig::*` / `aead::*` / `hash::*` constants.
+const CONSTANTS_JS = `/** @type {const} */
+export const ENCLAVE_PQ_SUITE_ID = "ENCLAVE_PQ_SUITE_v1";
+/** @type {const} */
+export const KDF_LABEL_PREFIX = "enclave-kdf-v1";
+/** @type {const} */
+export const KEM = Object.freeze({
+  ALGORITHM: "ML-KEM-1024",
+  PUBLIC_KEY_BYTES: 1568,
+  SECRET_KEY_SEED_BYTES: 64,
+  SECRET_KEY_EXPANDED_BYTES: 3168,
+  SECRET_KEY_BYTES: 3168,
+  CIPHERTEXT_BYTES: 1568,
+  SHARED_SECRET_BYTES: 32,
+  ENCAP_RANDOMNESS_BYTES: 32,
+});
+/** @type {const} */
+export const SIG = Object.freeze({
+  ALGORITHM: "ML-DSA-87",
+  PUBLIC_KEY_BYTES: 2592,
+  SECRET_KEY_SEED_BYTES: 32,
+  SECRET_KEY_EXPANDED_BYTES: 4896,
+  SECRET_KEY_BYTES: 4896,
+  SIGNATURE_BYTES: 4627,
+  MAX_CONTEXT_BYTES: 255,
+});
+/** @type {const} */
+export const AEAD = Object.freeze({
+  ALGORITHM: "AES-256-GCM",
+  KEY_BYTES: 32,
+  NONCE_BYTES: 12,
+  TAG_BYTES: 16,
+});
+/** @type {const} */
+export const HASH = Object.freeze({
+  ALGORITHM: "SHAKE256",
+  DEFAULT_OUTPUT_BYTES: 32,
+});
+
+/** @param {unknown} err */
+export function isPairwiseConsistencyFailure(err) {
+  return err instanceof Error && err.name === "PairwiseConsistencyFailureError";
+}
+
+/** @param {unknown} err */
+export function isSelfTestFailure(err) {
+  return err instanceof Error && err.name === "SelfTestFailureError";
+}
+`;
+
+const INDEX_DTS = `/** Category 5 sizes — must match Rust ENCLAVE_PQ_SUITE_v1. */
+export declare const ENCLAVE_PQ_SUITE_ID: "ENCLAVE_PQ_SUITE_v1";
+export declare const KDF_LABEL_PREFIX: "enclave-kdf-v1";
+export declare const KEM: {
+  readonly ALGORITHM: "ML-KEM-1024";
+  readonly PUBLIC_KEY_BYTES: 1568;
+  readonly SECRET_KEY_SEED_BYTES: 64;
+  readonly SECRET_KEY_EXPANDED_BYTES: 3168;
+  readonly SECRET_KEY_BYTES: 3168;
+  readonly CIPHERTEXT_BYTES: 1568;
+  readonly SHARED_SECRET_BYTES: 32;
+  readonly ENCAP_RANDOMNESS_BYTES: 32;
+};
+export declare const SIG: {
+  readonly ALGORITHM: "ML-DSA-87";
+  readonly PUBLIC_KEY_BYTES: 2592;
+  readonly SECRET_KEY_SEED_BYTES: 32;
+  readonly SECRET_KEY_EXPANDED_BYTES: 4896;
+  readonly SECRET_KEY_BYTES: 4896;
+  readonly SIGNATURE_BYTES: 4627;
+  readonly MAX_CONTEXT_BYTES: 255;
+};
+export declare const AEAD: {
+  readonly ALGORITHM: "AES-256-GCM";
+  readonly KEY_BYTES: 32;
+  readonly NONCE_BYTES: 12;
+  readonly TAG_BYTES: 16;
+};
+export declare const HASH: {
+  readonly ALGORITHM: "SHAKE256";
+  readonly DEFAULT_OUTPUT_BYTES: 32;
+};
+
+export type KemKeypair = { publicKey: Uint8Array; secretKey: Uint8Array };
+export type KemEncapsulation = {
+  ciphertext: Uint8Array;
+  sharedSecret: Uint8Array;
+};
+export type SigKeypair = { publicKey: Uint8Array; secretKey: Uint8Array };
+export type CryptoUsageRecord = {
+  algorithm: string;
+  suiteId: string;
+  operation: string;
+  crateVersion: string;
+};
+
+export declare function isPairwiseConsistencyFailure(err: unknown): boolean;
+export declare function isSelfTestFailure(err: unknown): boolean;
+
+export declare function kemGenerateKeypair(): KemKeypair;
+export declare function kemKeypairFromSeed(seed: Uint8Array): KemKeypair;
+export declare function kemExpandedSecretKey(secretKey: Uint8Array): Uint8Array;
+export declare function kemEncapsulate(publicKey: Uint8Array): KemEncapsulation;
+/** Hazmat — KATs only. Prefer kemEncapsulate. */
+export declare function kemEncapsulateDeterministic(
+  publicKey: Uint8Array,
+  m: Uint8Array,
+): KemEncapsulation;
+export declare function kemDecapsulate(
+  ciphertext: Uint8Array,
+  secretKey: Uint8Array,
+): Uint8Array;
+
+export declare function sigGenerateKeypair(): SigKeypair;
+export declare function sigKeypairFromSeed(seed: Uint8Array): SigKeypair;
+export declare function sigExpandedSecretKey(secretKey: Uint8Array): Uint8Array;
+export declare function sigSign(
+  secretKey: Uint8Array,
+  message: Uint8Array,
+): Uint8Array;
+export declare function sigSignWithContext(
+  secretKey: Uint8Array,
+  message: Uint8Array,
+  context: Uint8Array,
+): Uint8Array;
+export declare function sigVerify(
+  publicKey: Uint8Array,
+  message: Uint8Array,
+  signature: Uint8Array,
+): boolean;
+export declare function sigVerifyWithContext(
+  publicKey: Uint8Array,
+  message: Uint8Array,
+  signature: Uint8Array,
+  context: Uint8Array,
+): boolean;
+
+export declare function aeadEncrypt(
+  key: Uint8Array,
+  nonce: Uint8Array,
+  plaintext: Uint8Array,
+  aad: Uint8Array,
+): Uint8Array;
+export declare function aeadDecrypt(
+  key: Uint8Array,
+  nonce: Uint8Array,
+  ciphertext: Uint8Array,
+  aad: Uint8Array,
+): Uint8Array;
+
+export declare function shake256(
+  input: Uint8Array,
+  outputLen: number,
+): Uint8Array;
+export declare function hashUtf8(value: string, outputLen: number): Uint8Array;
+
+export declare function labeledKdf(
+  label: string,
+  ikm: Uint8Array,
+  length: number,
+): Uint8Array;
+export declare function labeledKdf32(
+  label: string,
+  ikm: Uint8Array,
+): Uint8Array;
+
+/** CBOM attach point: usage from the last WASM primitive call, or undefined. */
+export declare function getLastUsageRecord(): CryptoUsageRecord | undefined;
+
+/** CAST self-tests; rejects with SelfTestFailureError (\`err.name\`). */
+export declare function runSelfTests(): Promise<void>;
+
+/**
+ * Overwrite buffer bytes in place. WASM Drop zeroization does not apply to
+ * secret material copied into JS Uint8Arrays — call this when finished.
+ */
+export declare function zeroize(buf: Uint8Array): void;
+`;
+
+function indexJs(targetName) {
+  const header = `/**
+ * @enclave/pqc-primitives — algorithm-only façade (${targetName}).
+ *
+ * Category 5 exclusively (ML-KEM-1024 / ML-DSA-87). No suite parameter.
+ *
+ * Secret zeroization does NOT cross the WASM boundary. Call zeroize(buf) on
+ * long-lived secret Uint8Arrays when finished.
+ */
+export {
+  AEAD,
+  ENCLAVE_PQ_SUITE_ID,
+  HASH,
+  KDF_LABEL_PREFIX,
+  KEM,
+  SIG,
+  isPairwiseConsistencyFailure,
+  isSelfTestFailure,
+} from "./constants.js";
+`;
+
+  if (targetName === "nodejs") {
+    // wasm-pack --target nodejs emits CommonJS (`exports.*`), which Node ESM
+    // cannot named-import. Bridge via createRequire.
+    return `${header}
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const wasm = require("./enclave_pqc_primitives_wasm.cjs");
+
+export const aeadDecrypt = wasm.aeadDecrypt;
+export const aeadEncrypt = wasm.aeadEncrypt;
+export const getLastUsageRecord = wasm.getLastUsageRecord;
+export const hashUtf8 = wasm.hashUtf8;
+export const kemDecapsulate = wasm.kemDecapsulate;
+export const kemEncapsulate = wasm.kemEncapsulate;
+/** Hazmat — KATs only. Prefer kemEncapsulate in production. */
+export const kemEncapsulateDeterministic = wasm.kemEncapsulateDeterministic;
+export const kemExpandedSecretKey = wasm.kemExpandedSecretKey;
+export const kemGenerateKeypair = wasm.kemGenerateKeypair;
+export const kemKeypairFromSeed = wasm.kemKeypairFromSeed;
+export const labeledKdf = wasm.labeledKdf;
+export const labeledKdf32 = wasm.labeledKdf32;
+export const shake256 = wasm.shake256;
+export const sigExpandedSecretKey = wasm.sigExpandedSecretKey;
+export const sigGenerateKeypair = wasm.sigGenerateKeypair;
+export const sigKeypairFromSeed = wasm.sigKeypairFromSeed;
+export const sigSign = wasm.sigSign;
+export const sigSignWithContext = wasm.sigSignWithContext;
+export const sigVerify = wasm.sigVerify;
+export const sigVerifyWithContext = wasm.sigVerifyWithContext;
+export const zeroize = wasm.zeroize;
+
+/** Run CAST self-tests; throws SelfTestFailureError on failure. */
+export async function runSelfTests() {
+  wasm.runSelfTests();
+}
+`;
+  }
+
+  return `${header}
+import {
+  aeadDecrypt,
+  aeadEncrypt,
+  getLastUsageRecord,
+  hashUtf8,
+  kemDecapsulate,
+  kemEncapsulate,
+  kemEncapsulateDeterministic,
+  kemExpandedSecretKey,
+  kemGenerateKeypair,
+  kemKeypairFromSeed,
+  labeledKdf,
+  labeledKdf32,
+  runSelfTests as runSelfTestsSync,
+  shake256,
+  sigExpandedSecretKey,
+  sigGenerateKeypair,
+  sigKeypairFromSeed,
+  sigSign,
+  sigSignWithContext,
+  sigVerify,
+  sigVerifyWithContext,
+  zeroize,
+} from "./enclave_pqc_primitives_wasm.js";
+
+export {
+  aeadDecrypt,
+  aeadEncrypt,
+  getLastUsageRecord,
+  hashUtf8,
+  kemDecapsulate,
+  kemEncapsulate,
+  /** Hazmat — KATs only. Prefer kemEncapsulate in production. */
+  kemEncapsulateDeterministic,
+  kemExpandedSecretKey,
+  kemGenerateKeypair,
+  kemKeypairFromSeed,
+  labeledKdf,
+  labeledKdf32,
+  shake256,
+  sigExpandedSecretKey,
+  sigGenerateKeypair,
+  sigKeypairFromSeed,
+  sigSign,
+  sigSignWithContext,
+  sigVerify,
+  sigVerifyWithContext,
+  zeroize,
+};
+
+/** Run CAST self-tests; throws SelfTestFailureError on failure. */
+export async function runSelfTests() {
+  runSelfTestsSync();
+}
+`;
+}
+
+ensureWasmPack();
+run("rustup", ["target", "add", "wasm32-unknown-unknown"]);
+
+rmSync(join(root, "dist"), { recursive: true, force: true });
+
+for (const target of targets) {
+  mkdirSync(target.out, { recursive: true });
+  run("wasm-pack", [
+    "build",
+    wasmCrate,
+    "--release",
+    "--target",
+    target.name,
+    "--out-dir",
+    target.out,
+    "--out-name",
+    "enclave_pqc_primitives_wasm",
+  ]);
+  for (const junk of ["package.json", ".gitignore", "README.md"]) {
+    try {
+      rmSync(join(target.out, junk));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  writeFileSync(join(target.out, "constants.js"), CONSTANTS_JS);
+  writeFileSync(join(target.out, "index.js"), indexJs(target.name));
+  writeFileSync(join(target.out, "index.d.ts"), INDEX_DTS);
+
+  if (target.name === "nodejs") {
+    // package.json has "type":"module"; wasm-pack nodejs glue is CommonJS.
+    renameSync(
+      join(target.out, "enclave_pqc_primitives_wasm.js"),
+      join(target.out, "enclave_pqc_primitives_wasm.cjs"),
+    );
+  }
+}
+
+console.log("WASM bindings built → dist/{bundler,nodejs,web}");

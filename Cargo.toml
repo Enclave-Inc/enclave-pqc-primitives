@@ -1,10 +1,19 @@
+[workspace]
+resolver = "2"
+members = [".", "bindings/wasm"]
+
+[workspace.package]
+edition = "2021"
+license = "Apache-2.0"
+rust-version = "1.85"
+
 [package]
 name = "enclave-pqc-primitives"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.85"
+edition.workspace = true
+rust-version.workspace = true
 description = "NIST-aligned post-quantum cryptographic primitives for Enclave SDKs"
-license = "Apache-2.0"
+license.workspace = true
 readme = "README.md"
 repository = "https://github.com/Enclave-Inc/enclave-pqc-primitives"
 keywords = ["post-quantum", "ml-kem", "ml-dsa", "cryptography", "fips"]
@@ -13,7 +22,7 @@ categories = ["cryptography"]
 # ---------------------------------------------------------------------------
 # Dependency review (see README "Dependencies"):
 #   RustCrypto:        aes-gcm, ml-kem, ml-dsa, sha3, zeroize
-#   FLAGGED (review):  serde / serde_json (dev-only; NIST ACVP JSON fixtures)
+#   FLAGGED (review):  serde / serde_json (dev-only; reserved for future ACVP)
 # ---------------------------------------------------------------------------
 
 [dependencies]
@@ -24,8 +33,8 @@ sha3 = { version = "=0.10.8", default-features = false }
 zeroize = { version = "=1.8.1", default-features = false, features = ["alloc", "derive"] }
 
 [dev-dependencies]
-# FLAGGED — not RustCrypto / not NIST-reference code. Used only to deserialize
-# official NIST ACVP JSON fixtures under tests/nist/.
+# FLAGGED — not RustCrypto / not NIST-reference code. Reserved for future
+# official NIST ACVP JSON fixtures (Category 5).
 serde = { version = "=1.0.219", features = ["derive"] }
 serde_json = "=1.0.140"
 

@@ -1,7 +1,11 @@
 /target/
+/dist/
+/node_modules/
+/bindings/wasm/pkg/
 **/*.rs.bk
 .idea/
 .vscode/
 *.swp
 *.swo
 .DS_Store
+package-lock.json

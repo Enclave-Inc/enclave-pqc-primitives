@@ -6,8 +6,23 @@
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use sha3::Shake256;
 
+use crate::usage::CryptoUsageRecord;
+
 /// Algorithm identifier for the Enclave suite registry.
 pub const ALGORITHM: &str = "SHAKE256";
+
+/// Hash output plus CBOM usage metadata.
+#[derive(Clone, Debug)]
+pub struct HashOutput {
+    /// Digested / XOF bytes.
+    pub digest: Vec<u8>,
+    /// Algorithm / suite / crate metadata for this operation.
+    pub usage: CryptoUsageRecord,
+}
+
+fn usage(operation: &'static str) -> CryptoUsageRecord {
+    CryptoUsageRecord::new(ALGORITHM, operation)
+}
 
 /// Default output length in bytes for [`shake256`] when callers want a
 /// fixed-size digest-like value.
@@ -32,7 +47,16 @@ pub const DEFAULT_OUTPUT_BYTES: usize = 32;
 ///
 /// Panics if allocating the output buffer fails (standard `Vec` allocation).
 #[must_use]
-pub fn shake256(input: &[u8], output_len: usize) -> Vec<u8> {
+pub fn shake256(input: &[u8], output_len: usize) -> HashOutput {
+    HashOutput {
+        digest: shake256_raw(input, output_len),
+        usage: usage("hash"),
+    }
+}
+
+/// One-shot SHAKE256 without usage metadata (internal / KDF building block).
+#[must_use]
+pub(crate) fn shake256_raw(input: &[u8], output_len: usize) -> Vec<u8> {
     let mut hasher = Shake256::default();
     hasher.update(input);
     let mut output = vec![0u8; output_len];
@@ -44,7 +68,7 @@ pub fn shake256(input: &[u8], output_len: usize) -> Vec<u8> {
 ///
 /// Equivalent to [`shake256`] over `value.as_bytes()`.
 #[must_use]
-pub fn hash_utf8(value: &str, output_len: usize) -> Vec<u8> {
+pub fn hash_utf8(value: &str, output_len: usize) -> HashOutput {
     shake256(value.as_bytes(), output_len)
 }
 
@@ -93,10 +117,13 @@ impl Shake256Xof {
     /// Subsequent calls are impossible because `self` is consumed; this prevents
     /// accidental continued absorption after output has been released.
     #[must_use]
-    pub fn finalize_xof(self, output_len: usize) -> Vec<u8> {
-        let mut output = vec![0u8; output_len];
-        self.inner.finalize_xof().read(&mut output);
-        output
+    pub fn finalize_xof(self, output_len: usize) -> HashOutput {
+        let mut digest = vec![0u8; output_len];
+        self.inner.finalize_xof().read(&mut digest);
+        HashOutput {
+            digest,
+            usage: usage("hash_xof"),
+        }
     }
 
     /// Squeeze into a caller-provided buffer and consume this XOF instance.
@@ -111,10 +138,10 @@ mod tests {
 
     #[test]
     fn deterministic_and_length_prefix() {
-        let a = shake256(b"abc", 32);
-        let b = shake256(b"abc", 64);
+        let a = shake256(b"abc", 32).digest;
+        let b = shake256(b"abc", 64).digest;
         assert_eq!(a, b[..32]);
-        assert_ne!(a, shake256(b"abd", 32));
+        assert_ne!(a, shake256(b"abd", 32).digest);
     }
 
     #[test]
@@ -123,6 +150,6 @@ mod tests {
         xof.update(b"hello").unwrap();
         xof.update(b" world").unwrap();
         let out = xof.finalize_xof(48);
-        assert_eq!(out, shake256(b"hello world", 48));
+        assert_eq!(out.digest, shake256(b"hello world", 48).digest);
     }
 }

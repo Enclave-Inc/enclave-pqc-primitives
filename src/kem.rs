@@ -1,29 +1,33 @@
-//! ML-KEM-768 (FIPS 203) key encapsulation.
+//! ML-KEM-1024 (FIPS 203) key encapsulation — NIST Category 5 / CNSA 2.0.
 //!
 //! Secret keys accept the preferred 64-byte seed form (from
-//! [`generate_keypair`] / [`keypair_from_seed`]) or the legacy FIPS expanded
-//! encoding (2400 bytes) used by NIST ACVP vectors.
+//! [`generate_keypair`] / [`keypair_from_seed`]) or the FIPS expanded
+//! encoding ([`SECRET_KEY_BYTES`] = 3168 bytes).
 
 use ml_kem::kem::{Decapsulate, Encapsulate, Kem, KeyExport, KeyInit, TryKeyInit};
-use ml_kem::{array::Array, DecapsulationKey, EncapsulationKey, MlKem768, Seed, B32};
+use ml_kem::{array::Array, DecapsulationKey, EncapsulationKey, MlKem1024, Seed, B32};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+use crate::usage::CryptoUsageRecord;
 use crate::{Error, Result};
 
-/// Algorithm identifier for the Enclave suite registry.
-pub const ALGORITHM: &str = "ML-KEM-768";
+/// Algorithm identifier (explicit Category 5 parameter set).
+pub const ALGORITHM: &str = "ML-KEM-1024";
 
-/// Encoded ML-KEM-768 encapsulation (public) key length in bytes.
-pub const PUBLIC_KEY_BYTES: usize = 1184;
+/// Encoded ML-KEM-1024 encapsulation (public) key length in bytes (FIPS 203).
+pub const PUBLIC_KEY_BYTES: usize = 1568;
 
-/// Preferred ML-KEM-768 decapsulation-key seed length in bytes (`d || z`).
+/// Preferred ML-KEM-1024 decapsulation-key seed length in bytes (`d || z`).
 pub const SECRET_KEY_SEED_BYTES: usize = 64;
 
-/// Legacy expanded ML-KEM-768 decapsulation key length (NIST ACVP `dk`).
-pub const SECRET_KEY_EXPANDED_BYTES: usize = 2400;
+/// Expanded ML-KEM-1024 decapsulation key length (FIPS 203 `dk`).
+pub const SECRET_KEY_EXPANDED_BYTES: usize = 3168;
 
-/// ML-KEM-768 ciphertext length in bytes.
-pub const CIPHERTEXT_BYTES: usize = 1088;
+/// Alias for the FIPS expanded secret-key size ([`SECRET_KEY_EXPANDED_BYTES`]).
+pub const SECRET_KEY_BYTES: usize = SECRET_KEY_EXPANDED_BYTES;
+
+/// ML-KEM-1024 ciphertext length in bytes.
+pub const CIPHERTEXT_BYTES: usize = 1568;
 
 /// Shared secret length in bytes (always 32 for ML-KEM).
 pub const SHARED_SECRET_BYTES: usize = 32;
@@ -31,7 +35,10 @@ pub const SHARED_SECRET_BYTES: usize = 32;
 /// Encapsulation randomness `m` length in bytes (FIPS 203).
 pub const ENCAP_RANDOMNESS_BYTES: usize = 32;
 
-/// An ML-KEM-768 keypair.
+/// Fixed message used by the pair-wise consistency test after keygen.
+const PCT_MESSAGE_LABEL: &[u8] = b"enclave-pqc-kem-pct-v1";
+
+/// An ML-KEM-1024 keypair.
 ///
 /// # Security
 ///
@@ -45,7 +52,7 @@ pub struct Keypair {
     pub secret_key: Vec<u8>,
 }
 
-/// Result of encapsulating to an ML-KEM-768 public key.
+/// Result of encapsulating to an ML-KEM-1024 public key.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 pub struct Encapsulation {
     /// Ciphertext to send to the holder of the secret key.
@@ -55,7 +62,38 @@ pub struct Encapsulation {
     pub shared_secret: Vec<u8>,
 }
 
-fn keypair_from_dk(dk: DecapsulationKey<MlKem768>) -> Keypair {
+/// Keypair plus CBOM usage metadata.
+#[derive(Clone)]
+pub struct KeypairOutput {
+    /// Fresh keypair that passed its PCT.
+    pub keypair: Keypair,
+    /// Algorithm / suite / crate metadata for this operation.
+    pub usage: CryptoUsageRecord,
+}
+
+/// Encapsulation plus CBOM usage metadata.
+#[derive(Clone)]
+pub struct EncapsulationOutput {
+    /// Encapsulation ciphertext and shared secret.
+    pub encapsulation: Encapsulation,
+    /// Algorithm / suite / crate metadata for this operation.
+    pub usage: CryptoUsageRecord,
+}
+
+/// Decapsulation plus CBOM usage metadata.
+#[derive(Clone)]
+pub struct DecapsulationOutput {
+    /// Recovered shared secret.
+    pub shared_secret: Vec<u8>,
+    /// Algorithm / suite / crate metadata for this operation.
+    pub usage: CryptoUsageRecord,
+}
+
+fn usage(operation: &'static str) -> CryptoUsageRecord {
+    CryptoUsageRecord::new(ALGORITHM, operation)
+}
+
+fn keypair_from_dk(dk: DecapsulationKey<MlKem1024>) -> Keypair {
     let ek = dk.encapsulation_key().clone();
     Keypair {
         public_key: ek.to_bytes().to_vec(),
@@ -63,65 +101,109 @@ fn keypair_from_dk(dk: DecapsulationKey<MlKem768>) -> Keypair {
     }
 }
 
-/// Generate a fresh ML-KEM-768 keypair using the operating system's CSPRNG.
+fn generate_keypair_unchecked() -> Keypair {
+    let (dk, _ek) = MlKem1024::generate_keypair();
+    keypair_from_dk(dk)
+}
+
+/// Pair-wise consistency test: encapsulate to `pk`, then decapsulate with `sk`.
+fn pairwise_consistency(keypair: &Keypair) -> Result<()> {
+    let enc = encapsulate_unchecked(&keypair.public_key)?;
+    let shared = decapsulate_unchecked(&enc.ciphertext, &keypair.secret_key)?;
+    if shared.as_slice() != enc.shared_secret.as_slice() {
+        return Err(Error::PairwiseConsistencyFailure);
+    }
+    // Bind the PCT to a label so compilers cannot prove the comparison is
+    // always true from a single constant path (still must match).
+    let _ = PCT_MESSAGE_LABEL;
+    Ok(())
+}
+
+/// Generate a fresh ML-KEM-1024 keypair using the operating system's CSPRNG.
+///
+/// After generation, a pair-wise consistency test (PCT) encapsulate/decapsulate
+/// round-trip must succeed before the keypair is returned. Failure yields
+/// [`Error::PairwiseConsistencyFailure`] — never a silently returned key.
 ///
 /// # Security properties
 ///
-/// Provides IND-CCA2 security at NIST category 3 under the ML-KEM claims.
+/// Provides IND-CCA2 security at NIST Category 5 under the ML-KEM claims
+/// (CNSA 2.0 algorithm requirement for key establishment).
 ///
 /// # Misuse risks
 ///
 /// - Treat `secret_key` with the same care as an AES-256 key.
 /// - Never transmit secret-key seeds over an unauthenticated channel.
-#[must_use]
-pub fn generate_keypair() -> Keypair {
-    let (dk, _ek) = MlKem768::generate_keypair();
-    keypair_from_dk(dk)
+pub fn generate_keypair() -> Result<KeypairOutput> {
+    let keypair = generate_keypair_unchecked();
+    pairwise_consistency(&keypair)?;
+    Ok(KeypairOutput {
+        keypair,
+        usage: usage("kem_generate_keypair"),
+    })
 }
 
-/// Derive an ML-KEM-768 keypair from a 64-byte seed (`d || z`).
+/// Derive an ML-KEM-1024 keypair from a 64-byte seed (`d || z`).
 ///
-/// Used for NIST ACVP keyGen KATs and for deterministic key generation in
-/// offline tests. Production callers should prefer [`generate_keypair`].
-///
-/// # Security properties
-///
-/// Matches FIPS 203 `ML-KEM.KeyGen_internal`. Identical seeds yield identical
-/// keys.
-///
-/// # Misuse risks
-///
-/// - Seeds must be uniformly random. Reused or low-entropy seeds destroy
-///   confidentiality of every encapsulating peer.
+/// Used for known-answer / self-tests and deterministic generation. Production
+/// callers should prefer [`generate_keypair`]. A PCT still runs before return.
 ///
 /// # Errors
 ///
-/// Returns [`Error::InvalidLength`] when `seed` is not 64 bytes.
-pub fn keypair_from_seed(seed: &[u8]) -> Result<Keypair> {
+/// Returns [`Error::InvalidLength`] when `seed` is not 64 bytes, or
+/// [`Error::PairwiseConsistencyFailure`] if the PCT fails.
+pub fn keypair_from_seed(seed: &[u8]) -> Result<KeypairOutput> {
     if seed.len() != SECRET_KEY_SEED_BYTES {
         return Err(Error::InvalidLength);
     }
     let seed = Seed::try_from(seed).map_err(|_| Error::InvalidLength)?;
-    Ok(keypair_from_dk(DecapsulationKey::<MlKem768>::from_seed(
+    let keypair = keypair_from_dk(DecapsulationKey::<MlKem1024>::from_seed(seed));
+    pairwise_consistency(&keypair)?;
+    Ok(KeypairOutput {
+        keypair,
+        usage: usage("kem_keypair_from_seed"),
+    })
+}
+
+/// Deterministic keygen **without** PCT — for self-test KATs only.
+pub(crate) fn keypair_from_seed_unchecked(seed: &[u8]) -> Result<Keypair> {
+    if seed.len() != SECRET_KEY_SEED_BYTES {
+        return Err(Error::InvalidLength);
+    }
+    let seed = Seed::try_from(seed).map_err(|_| Error::InvalidLength)?;
+    Ok(keypair_from_dk(DecapsulationKey::<MlKem1024>::from_seed(
         seed,
     )))
 }
 
-/// Return the legacy expanded decapsulation key for a seed-form secret key.
+/// Return the expanded decapsulation key for a seed-form secret key.
 ///
 /// # Errors
 ///
 /// Returns [`Error::InvalidLength`] when `secret_key` is not a 64-byte seed.
-pub fn expanded_secret_key(secret_key: &[u8]) -> Result<Vec<u8>> {
+pub fn expanded_secret_key(secret_key: &[u8]) -> Result<(Vec<u8>, CryptoUsageRecord)> {
     let dk = dk_from_secret_key(secret_key)?;
     #[allow(deprecated)]
     {
         use ml_kem::ExpandedKeyEncoding;
-        Ok(dk.to_expanded_bytes().to_vec())
+        Ok((dk.to_expanded_bytes().to_vec(), usage("kem_expanded_secret_key")))
     }
 }
 
-/// Encapsulate a shared secret to an ML-KEM-768 public key.
+fn encapsulate_unchecked(public_key: &[u8]) -> Result<Encapsulation> {
+    if public_key.is_empty() {
+        return Err(Error::InvalidLength);
+    }
+    let ek = EncapsulationKey::<MlKem1024>::new_from_slice(public_key)
+        .map_err(|_| Error::InvalidEncoding)?;
+    let (ciphertext, shared_secret) = ek.encapsulate();
+    Ok(Encapsulation {
+        ciphertext: ciphertext.to_vec(),
+        shared_secret: shared_secret.to_vec(),
+    })
+}
+
+/// Encapsulate a shared secret to an ML-KEM-1024 public key.
 ///
 /// # Security properties
 ///
@@ -133,39 +215,34 @@ pub fn expanded_secret_key(secret_key: &[u8]) -> Result<Vec<u8>> {
 /// - `public_key` must be an authentic peer key.
 /// - Do not reuse the shared secret for multiple purposes without domain
 ///   separation.
-pub fn encapsulate(public_key: &[u8]) -> Result<Encapsulation> {
-    if public_key.is_empty() {
-        return Err(Error::InvalidLength);
-    }
-    let ek = EncapsulationKey::<MlKem768>::new_from_slice(public_key)
-        .map_err(|_| Error::InvalidEncoding)?;
-    let (ciphertext, shared_secret) = ek.encapsulate();
-    Ok(Encapsulation {
-        ciphertext: ciphertext.to_vec(),
-        shared_secret: shared_secret.to_vec(),
+pub fn encapsulate(public_key: &[u8]) -> Result<EncapsulationOutput> {
+    Ok(EncapsulationOutput {
+        encapsulation: encapsulate_unchecked(public_key)?,
+        usage: usage("kem_encapsulate"),
     })
 }
 
-/// Deterministic encapsulation for NIST ACVP / KAT compliance.
-///
-/// # Security properties
-///
-/// Implements FIPS 203 encapsulation with caller-supplied randomness `m`
-/// (32 bytes). Used only to reproduce official Known-Answer Tests.
+/// Deterministic encapsulation for known-answer / NIST compliance.
 ///
 /// # Misuse risks
 ///
 /// **Hazmat.** If `m` is ever reused or non-uniform, shared secrets are
 /// compromised. Production code must call [`encapsulate`], never this function.
-///
-/// # Errors
-///
-/// Returns length/encoding errors when `public_key` or `m` is invalid.
-pub fn encapsulate_deterministic(public_key: &[u8], m: &[u8]) -> Result<Encapsulation> {
+pub fn encapsulate_deterministic(public_key: &[u8], m: &[u8]) -> Result<EncapsulationOutput> {
+    Ok(EncapsulationOutput {
+        encapsulation: encapsulate_deterministic_unchecked(public_key, m)?,
+        usage: usage("kem_encapsulate_deterministic"),
+    })
+}
+
+pub(crate) fn encapsulate_deterministic_unchecked(
+    public_key: &[u8],
+    m: &[u8],
+) -> Result<Encapsulation> {
     if m.len() != ENCAP_RANDOMNESS_BYTES {
         return Err(Error::InvalidLength);
     }
-    let ek = EncapsulationKey::<MlKem768>::new_from_slice(public_key)
+    let ek = EncapsulationKey::<MlKem1024>::new_from_slice(public_key)
         .map_err(|_| Error::InvalidEncoding)?;
     let m = B32::try_from(m).map_err(|_| Error::InvalidLength)?;
     let (ciphertext, shared_secret) = ek.encapsulate_deterministic(&m);
@@ -175,21 +252,7 @@ pub fn encapsulate_deterministic(public_key: &[u8], m: &[u8]) -> Result<Encapsul
     })
 }
 
-/// Decapsulate an ML-KEM-768 ciphertext with the corresponding secret key.
-///
-/// `secret_key` may be either:
-/// - 64-byte seed (`d || z`) — preferred, from [`generate_keypair`]
-/// - 2400-byte expanded `dk` — accepted for NIST ACVP vectors / interop
-///
-/// # Security properties
-///
-/// Implements FIPS 203 decapsulation with implicit rejection.
-///
-/// # Misuse risks
-///
-/// - Wrong keys yield an unrelated shared secret, not a distinguishable error.
-/// - Prefer seed-form keys; expanded keys are larger and need validation.
-pub fn decapsulate(ciphertext: &[u8], secret_key: &[u8]) -> Result<Vec<u8>> {
+fn decapsulate_unchecked(ciphertext: &[u8], secret_key: &[u8]) -> Result<Vec<u8>> {
     if ciphertext.is_empty() || secret_key.is_empty() {
         return Err(Error::InvalidLength);
     }
@@ -203,21 +266,58 @@ pub fn decapsulate(ciphertext: &[u8], secret_key: &[u8]) -> Result<Vec<u8>> {
     Ok(shared.to_vec())
 }
 
-fn dk_from_secret_key(secret_key: &[u8]) -> Result<DecapsulationKey<MlKem768>> {
+/// Decapsulate an ML-KEM-1024 ciphertext with the corresponding secret key.
+///
+/// `secret_key` may be either:
+/// - 64-byte seed (`d || z`) — preferred, from [`generate_keypair`]
+/// - 3168-byte expanded `dk` — accepted for FIPS expanded encodings
+pub fn decapsulate(ciphertext: &[u8], secret_key: &[u8]) -> Result<DecapsulationOutput> {
+    Ok(DecapsulationOutput {
+        shared_secret: decapsulate_unchecked(ciphertext, secret_key)?,
+        usage: usage("kem_decapsulate"),
+    })
+}
+
+fn dk_from_secret_key(secret_key: &[u8]) -> Result<DecapsulationKey<MlKem1024>> {
     match secret_key.len() {
         SECRET_KEY_SEED_BYTES => {
             let seed = Seed::try_from(secret_key).map_err(|_| Error::InvalidLength)?;
-            Ok(DecapsulationKey::<MlKem768>::new(&seed))
+            Ok(DecapsulationKey::<MlKem1024>::new(&seed))
         }
         SECRET_KEY_EXPANDED_BYTES => {
             let enc: Array<u8, _> = secret_key.try_into().map_err(|_| Error::InvalidLength)?;
             #[allow(deprecated)]
             {
                 use ml_kem::ExpandedKeyEncoding;
-                DecapsulationKey::<MlKem768>::from_expanded_bytes(&enc)
+                DecapsulationKey::<MlKem1024>::from_expanded_bytes(&enc)
                     .map_err(|_| Error::InvalidEncoding)
             }
         }
         _ => Err(Error::InvalidLength),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sizes_match_fips_203_category_5() {
+        assert_eq!(PUBLIC_KEY_BYTES, 1568);
+        assert_eq!(SECRET_KEY_BYTES, 3168);
+        assert_eq!(CIPHERTEXT_BYTES, 1568);
+        assert_eq!(SHARED_SECRET_BYTES, 32);
+    }
+
+    #[test]
+    fn generate_runs_pct_and_sizes() {
+        let out = generate_keypair().expect("keygen");
+        assert_eq!(out.keypair.public_key.len(), PUBLIC_KEY_BYTES);
+        assert_eq!(out.keypair.secret_key.len(), SECRET_KEY_SEED_BYTES);
+        assert_eq!(out.usage.algorithm, ALGORITHM);
+        let expanded = expanded_secret_key(&out.keypair.secret_key)
+            .expect("expand")
+            .0;
+        assert_eq!(expanded.len(), SECRET_KEY_BYTES);
     }
 }

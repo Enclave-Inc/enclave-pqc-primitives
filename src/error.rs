@@ -19,6 +19,8 @@ pub enum Error {
     SignatureInvalid,
     /// An operation was refused due to unsafe or out-of-range parameters.
     InvalidParameter,
+    /// Freshly generated keypair failed its pair-wise consistency test (PCT).
+    PairwiseConsistencyFailure,
 }
 
 impl Error {
@@ -31,6 +33,9 @@ impl Error {
             Self::AeadFailure => "AEAD authentication failed",
             Self::SignatureInvalid => "signature verification failed",
             Self::InvalidParameter => "invalid cryptographic parameter",
+            Self::PairwiseConsistencyFailure => {
+                "keypair failed pair-wise consistency test"
+            }
         }
     }
 }
@@ -45,3 +50,34 @@ impl std::error::Error for Error {}
 
 /// Crate-wide result alias.
 pub type Result<T> = core::result::Result<T, Error>;
+
+/// Errors from [`crate::self_test::run_self_tests`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SelfTestError {
+    /// A known-answer (CAST) comparison failed.
+    KnownAnswerMismatch {
+        /// Which CAST case failed (`"sig"` / `"kem"` / …).
+        case: &'static str,
+    },
+    /// An underlying primitive returned an unexpected [`Error`].
+    Primitive(Error),
+}
+
+impl fmt::Display for SelfTestError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::KnownAnswerMismatch { case } => {
+                write!(f, "self-test known-answer mismatch ({case})")
+            }
+            Self::Primitive(err) => write!(f, "self-test primitive error: {err}"),
+        }
+    }
+}
+
+impl std::error::Error for SelfTestError {}
+
+impl From<Error> for SelfTestError {
+    fn from(value: Error) -> Self {
+        Self::Primitive(value)
+    }
+}
