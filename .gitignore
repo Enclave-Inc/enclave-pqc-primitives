@@ -1,4 +1,7 @@
-node_modules/
-dist/
-*.tsbuildinfo
+/target/
+**/*.rs.bk
+.idea/
+.vscode/
+*.swp
+*.swo
 .DS_Store
