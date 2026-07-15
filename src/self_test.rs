@@ -11,6 +11,7 @@
 
 use crate::error::SelfTestError;
 use crate::kem;
+use crate::pwhash::{self, Argon2Params, SALT_BYTES};
 use crate::sig;
 
 /// Fixed 64-byte ML-KEM-1024 seed (`d || z`) for the KEM CAST.
@@ -38,6 +39,19 @@ const SIG_SEED: [u8; 32] = [
 
 /// Fixed message for the signature CAST.
 const SIG_MESSAGE: &[u8] = b"enclave-pqc-cast-sig-v1";
+
+/// Fixed password for the Argon2id CAST (not a real user secret).
+const PWHASH_PASSWORD: &[u8] = b"enclave-pqc-cast-pwhash-v1";
+
+/// Fixed 16-byte salt for the Argon2id CAST.
+const PWHASH_SALT: [u8; SALT_BYTES] = [
+    0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a, 0x7b, 0x7c, 0x7d, 0x7e,
+    0x7f,
+];
+
+/// OWASP-baseline params used by the Argon2id CAST (must match
+/// [`pwhash::RECOMMENDED_PARAMS`]).
+const PWHASH_PARAMS: Argon2Params = pwhash::RECOMMENDED_PARAMS;
 
 /// SHAKE256-32 of the CAST public key / shared secret / signature used as the
 /// compact known answer (avoids embedding multi-kilobyte blobs in-source while
@@ -72,6 +86,12 @@ mod expected {
         0x2a, 0xa3, 0xee, 0x21, 0x2e, 0x35, 0x6b, 0x44, 0xbb, 0x90, 0x51, 0x8a, 0xa3, 0xf6, 0x75,
         0x12, 0xb3, 0x14, 0xfb, 0xcc, 0x90, 0x88, 0x49, 0xab, 0xc9, 0xec, 0x9c, 0xd3, 0x33, 0x69,
         0x72, 0x8c,
+    ];
+    /// Argon2id key for (PWHASH_PASSWORD, PWHASH_SALT, RECOMMENDED_PARAMS).
+    pub const PWHASH_KEY: [u8; 32] = [
+        0xa0, 0xe7, 0x12, 0x80, 0x50, 0xcf, 0x5d, 0x8a, 0x40, 0x47, 0xfb, 0x32, 0x82, 0x0b, 0xd1,
+        0xb4, 0x90, 0x1f, 0xca, 0x78, 0x93, 0x6e, 0xe8, 0x6c, 0xa9, 0x2f, 0x7c, 0x13, 0x17, 0xf9,
+        0x9a, 0x4e,
     ];
 }
 
@@ -110,6 +130,21 @@ fn cast_kem() -> core::result::Result<(), SelfTestError> {
     Ok(())
 }
 
+fn cast_pwhash() -> core::result::Result<(), SelfTestError> {
+    let derived = pwhash::pwhash_derive_key(PWHASH_PASSWORD, &PWHASH_SALT, &PWHASH_PARAMS)?;
+    if derived.key.as_slice() != expected::PWHASH_KEY {
+        return Err(SelfTestError::KnownAnswerMismatch { case: "pwhash" });
+    }
+    // Determinism check (required to unwrap sealed data later).
+    let again = pwhash::pwhash_derive_key(PWHASH_PASSWORD, &PWHASH_SALT, &PWHASH_PARAMS)?;
+    if again.key != derived.key {
+        return Err(SelfTestError::KnownAnswerMismatch {
+            case: "pwhash_determinism",
+        });
+    }
+    Ok(())
+}
+
 fn cast_sig() -> core::result::Result<(), SelfTestError> {
     let kp = sig::keypair_from_seed_unchecked(&SIG_SEED)?;
     let pk_digest = digest32(&kp.public_key);
@@ -137,13 +172,16 @@ fn cast_sig() -> core::result::Result<(), SelfTestError> {
     }
 }
 
-/// Run known-answer CASTs for ML-KEM-1024 and ML-DSA-87.
+/// Run known-answer CASTs for ML-KEM-1024, ML-DSA-87, and Argon2id.
 ///
 /// Intended for power-on / module-entry self-tests. Pair-wise consistency
 /// tests already run inside key generation; this function does not replace them.
+/// Argon2id is classical (not Category 5 / CNSA) but follows the same CAST
+/// discipline so password → key cannot silently drift.
 pub fn run_self_tests() -> core::result::Result<(), SelfTestError> {
     cast_kem()?;
     cast_sig()?;
+    cast_pwhash()?;
     Ok(())
 }
 

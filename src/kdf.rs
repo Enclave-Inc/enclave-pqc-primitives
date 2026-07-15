@@ -56,6 +56,7 @@ fn usage(operation: &'static str) -> CryptoUsageRecord {
 /// - Avoid embedding raw `:`-heavy untrusted strings in `label` if those
 ///   strings could collide across products; prefer stable ASCII constants.
 /// - This is **not** a password hashing function (no salt/memory hardness).
+///   Use [`crate::pwhash`] (Argon2id) for human passwords.
 /// - `length == 0` is rejected.
 ///
 /// # Errors

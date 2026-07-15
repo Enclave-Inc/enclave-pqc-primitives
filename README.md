@@ -25,7 +25,16 @@ suite-selection API.
 | Bulk AEAD | AES-256-GCM | FIPS 197 / SP 800-38D | RustCrypto [`aes-gcm`](https://crates.io/crates/aes-gcm) |
 | Hash / XOF | SHAKE256 | FIPS 202 | RustCrypto [`sha3`](https://crates.io/crates/sha3) |
 | Labeled KDF | `enclave-kdf-v1` | SHAKE256 domain-separated | this crate |
+| Password → key | Argon2id | RFC 9106 (classical) | RustCrypto [`argon2`](https://crates.io/crates/argon2) |
 
+`enclave-kdf-v1` is for **high-entropy** input (shared secrets, etc.).
+**Argon2id** (`pwhash`) is for **human passwords**: deliberately slow and
+memory-hard so stolen ciphertext resists offline guessing. Do not substitute
+one for the other, and do not lower OWASP baseline params for login latency
+without treating that as a direct security tradeoff.
+
+Argon2id is classical and **outside** the Category 5 / CNSA 2.0 suite table —
+it fills the password → key gap alongside those primitives.
 ### Encoding sizes (FIPS)
 
 | | Public key | Secret (expanded) | Seed | Ciphertext / signature |
@@ -36,7 +45,7 @@ suite-selection API.
 ## Layout
 
 ```text
-src/                 Rust primitives (kem, sig, aead, hash, kdf, provider, self_test, usage)
+src/                 Rust primitives (kem, sig, aead, hash, kdf, pwhash, provider, self_test, usage)
 bindings/wasm/       wasm-bindgen façade (algorithm names only)
 js/                  TS helpers / constants (source of truth for sizes)
 scripts/build-wasm.mjs
@@ -47,14 +56,18 @@ tests/               Round-trips, CAST coverage, AES/SHAKE KATs
 ## Rust usage
 
 ```rust
-use enclave_pqc_primitives::{aead, kdf, kem, run_self_tests, sig, SoftwareProvider, CryptoProvider};
+use enclave_pqc_primitives::{aead, kdf, kem, pwhash, run_self_tests, sig, SoftwareProvider, CryptoProvider};
 
-run_self_tests()?; // optional CAST at startup
+run_self_tests()?; // optional CAST at startup (includes Argon2id KAT)
 
 let kem_kp = kem::generate_keypair()?; // includes PCT
 let enc = kem::encapsulate(&kem_kp.keypair.public_key)?;
 let shared = kem::decapsulate(&enc.encapsulation.ciphertext, &kem_kp.keypair.secret_key)?;
 let aes_key = kdf::labeled_kdf("aes-256-gcm-key", &shared.shared_secret, 32)?;
+
+// Human password → AEAD key (OWASP Argon2id baseline; intentionally slow):
+let salt = pwhash::generate_salt()?;
+let pw_key = pwhash::pwhash_derive_key(b"user-passphrase", &salt.salt, &pwhash::RECOMMENDED_PARAMS)?;
 
 let nonce = [0u8; aead::NONCE_BYTES]; // caller must ensure uniqueness
 let sealed = aead::encrypt(&aes_key.key, &nonce, b"hello", b"aad")?;
@@ -97,11 +110,12 @@ npm test
 
 ```ts
 import {
-  KEM, SIG, AEAD, HASH, KDF_LABEL_PREFIX,
+  KEM, SIG, AEAD, HASH, KDF_LABEL_PREFIX, PWHASH,
   kemGenerateKeypair, kemEncapsulate, kemDecapsulate,
   sigGenerateKeypair, sigSign, sigSignWithContext, sigVerify,
   aeadEncrypt, aeadDecrypt,
   labeledKdf, labeledKdf32, shake256, zeroize,
+  pwhashDeriveKey, generateSalt, RECOMMENDED_PARAMS,
   runSelfTests, getLastUsageRecord,
   isPairwiseConsistencyFailure, isSelfTestFailure,
 } from "@enclave/pqc-primitives";
@@ -136,6 +150,8 @@ finished with long-lived secrets.
 | `ml-dsa =0.1.1` | ML-DSA-87 | **RustCrypto** |
 | `aes-gcm =0.10.3` | AES-256-GCM | **RustCrypto** |
 | `sha3 =0.10.8` | SHAKE256 | **RustCrypto** |
+| `argon2 =0.5.3` | Argon2id (password → key) | **RustCrypto** |
+| `getrandom =0.2.17` | CSPRNG for salts / (via ML-*) | **RustCrypto** adjacent |
 | `zeroize =1.8.1` | Secret wipe-on-drop | **RustCrypto** |
 
 ### Flagged dependencies

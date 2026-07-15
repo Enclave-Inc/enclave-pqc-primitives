@@ -5,6 +5,7 @@
  * logic into this package.
  *
  * Category 5 exclusively (ML-KEM-1024 / ML-DSA-87). No suite parameter.
+ * Argon2id (`pwhash*`) is the classical password → key companion primitive.
  *
  * # Secret zeroization
  *
@@ -19,9 +20,11 @@ export {
   HASH,
   KDF_LABEL_PREFIX,
   KEM,
+  PWHASH,
   SIG,
   isPairwiseConsistencyFailure,
   isSelfTestFailure,
+  type Argon2Params,
   type CryptoUsageRecord,
   type KemEncapsulation,
   type KemKeypair,
@@ -31,6 +34,7 @@ export {
 export {
   aeadDecrypt,
   aeadEncrypt,
+  generateSalt,
   getLastUsageRecord,
   hashUtf8,
   kemDecapsulate,
@@ -45,6 +49,8 @@ export {
   kemKeypairFromSeed,
   labeledKdf,
   labeledKdf32,
+  pwhashDeriveKey,
+  RECOMMENDED_PARAMS,
   runSelfTests,
   shake256,
   sigExpandedSecretKey,

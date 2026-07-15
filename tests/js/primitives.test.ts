@@ -4,9 +4,11 @@ import {
   HASH,
   KDF_LABEL_PREFIX,
   KEM,
+  PWHASH,
   SIG,
   aeadDecrypt,
   aeadEncrypt,
+  generateSalt,
   getLastUsageRecord,
   hashUtf8,
   isSelfTestFailure,
@@ -16,6 +18,8 @@ import {
   kemGenerateKeypair,
   labeledKdf,
   labeledKdf32,
+  pwhashDeriveKey,
+  RECOMMENDED_PARAMS,
   runSelfTests,
   shake256,
   sigGenerateKeypair,
@@ -39,6 +43,14 @@ describe("@enclave/pqc-primitives wasm bindings (Category 5)", () => {
     expect(AEAD.NONCE_BYTES).toBe(12);
     expect(HASH.DEFAULT_OUTPUT_BYTES).toBe(32);
     expect(KDF_LABEL_PREFIX).toBe("enclave-kdf-v1");
+    expect(PWHASH.ALGORITHM).toBe("Argon2id");
+    expect(PWHASH.SALT_BYTES).toBe(16);
+    expect(PWHASH.OUTPUT_BYTES).toBe(32);
+    expect(PWHASH.RECOMMENDED_PARAMS).toEqual({
+      memoryCostKib: 19456,
+      iterations: 2,
+      parallelism: 1,
+    });
   });
 
   it("passes CAST self-tests", async () => {
@@ -135,6 +147,55 @@ describe("@enclave/pqc-primitives wasm bindings (Category 5)", () => {
     const dig = shake256(new TextEncoder().encode("abc"), 32);
     expect(dig.length).toBe(32);
     expect(hashUtf8("abc", 32)).toEqual(dig);
+  });
+
+  it("pwhashDeriveKey is deterministic; salts diversify; records usage", () => {
+    const password = new TextEncoder().encode("correct horse battery staple");
+    const saltA = new Uint8Array(PWHASH.SALT_BYTES).fill(0x11);
+    const saltB = new Uint8Array(PWHASH.SALT_BYTES).fill(0x22);
+    const params = PWHASH.RECOMMENDED_PARAMS;
+    expect(RECOMMENDED_PARAMS()).toEqual(params);
+
+    const a1 = pwhashDeriveKey(password, saltA, params);
+    const a2 = pwhashDeriveKey(password, saltA, params);
+    expect(a1.length).toBe(PWHASH.OUTPUT_BYTES);
+    expect(Buffer.from(a1)).toEqual(Buffer.from(a2));
+
+    const b = pwhashDeriveKey(password, saltB, params);
+    expect(Buffer.from(a1)).not.toEqual(Buffer.from(b));
+
+    const usage = getLastUsageRecord();
+    expect(usage?.algorithm).toBe("Argon2id");
+    expect(usage?.operation).toBe("pwhash_derive_key");
+    zeroize(a1);
+    zeroize(a2);
+    zeroize(b);
+  });
+
+  it("generateSalt returns 16 random bytes", () => {
+    const s1 = generateSalt();
+    const s2 = generateSalt();
+    expect(s1.length).toBe(PWHASH.SALT_BYTES);
+    expect(s2.length).toBe(PWHASH.SALT_BYTES);
+    expect(Buffer.from(s1)).not.toEqual(Buffer.from(s2));
+    expect(getLastUsageRecord()?.operation).toBe("pwhash_generate_salt");
+  });
+
+  it("logs WASM Argon2id RECOMMENDED_PARAMS timing (observation only)", () => {
+    const password = new TextEncoder().encode("wasm-timing-observation");
+    const salt = new Uint8Array(PWHASH.SALT_BYTES).fill(0x55);
+    const start = performance.now();
+    const key = pwhashDeriveKey(password, salt, PWHASH.RECOMMENDED_PARAMS);
+    const ms = performance.now() - start;
+    // Soft bounds only — not a CI gate. Flag multi-second WASM as a finding.
+    console.log(
+      `[pwhash] WASM RECOMMENDED_PARAMS elapsed=${ms.toFixed(1)}ms ` +
+        `(memory-hard by design; multi-second would be a UX finding)`,
+    );
+    expect(key.length).toBe(32);
+    expect(ms).toBeGreaterThanOrEqual(1);
+    expect(ms).toBeLessThan(30_000);
+    zeroize(key);
   });
 
   it("zeroize clears the buffer in place", () => {

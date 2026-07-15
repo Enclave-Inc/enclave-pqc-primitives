@@ -21,12 +21,16 @@ categories = ["cryptography"]
 
 # ---------------------------------------------------------------------------
 # Dependency review (see README "Dependencies"):
-#   RustCrypto:        aes-gcm, ml-kem, ml-dsa, sha3, zeroize
+#   RustCrypto:        aes-gcm, argon2, ml-kem, ml-dsa, sha3, zeroize
+#   RustCrypto-adj:    getrandom (salt / KeyGen CSPRNG)
 #   FLAGGED (review):  serde / serde_json (dev-only; reserved for future ACVP)
 # ---------------------------------------------------------------------------
 
 [dependencies]
 aes-gcm = { version = "=0.10.3", default-features = false, features = ["aes", "alloc"] }
+# RustCrypto Argon2id — password → key (memory-hard). Not part of the PQ suite.
+argon2 = { version = "=0.5.3", default-features = false, features = ["alloc", "zeroize"] }
+getrandom = { version = "=0.2.17", default-features = false }
 ml-dsa = { version = "=0.1.1", default-features = false, features = ["alloc", "getrandom", "rand_core", "zeroize"] }
 ml-kem = { version = "=0.3.2", default-features = false, features = ["alloc", "getrandom", "hazmat", "zeroize"] }
 sha3 = { version = "=0.10.8", default-features = false }

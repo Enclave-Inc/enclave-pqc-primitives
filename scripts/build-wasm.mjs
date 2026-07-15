@@ -2,11 +2,10 @@
 /**
  * Build WASM bindings for bundler / nodejs / web targets, then emit JS façades.
  */
-import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const wasmCrate = join(root, "bindings", "wasm");
 const targets = [
@@ -78,6 +77,22 @@ export const HASH = Object.freeze({
   ALGORITHM: "SHAKE256",
   DEFAULT_OUTPUT_BYTES: 32,
 });
+/** @type {const} */
+export const PWHASH = Object.freeze({
+  ALGORITHM: "Argon2id",
+  SALT_BYTES: 16,
+  OUTPUT_BYTES: 32,
+  /**
+   * OWASP Password Storage Cheat Sheet baseline (verified 2026-07-14):
+   * m=19456 (19 MiB), t=2, p=1. Deliberately slow + memory-hard — do not
+   * lower these for login latency without treating that as a security tradeoff.
+   */
+  RECOMMENDED_PARAMS: Object.freeze({
+    memoryCostKib: 19456,
+    iterations: 2,
+    parallelism: 1,
+  }),
+});
 
 /** @param {unknown} err */
 export function isPairwiseConsistencyFailure(err) {
@@ -121,6 +136,22 @@ export declare const AEAD: {
 export declare const HASH: {
   readonly ALGORITHM: "SHAKE256";
   readonly DEFAULT_OUTPUT_BYTES: 32;
+};
+export declare const PWHASH: {
+  readonly ALGORITHM: "Argon2id";
+  readonly SALT_BYTES: 16;
+  readonly OUTPUT_BYTES: 32;
+  readonly RECOMMENDED_PARAMS: {
+    readonly memoryCostKib: 19456;
+    readonly iterations: 2;
+    readonly parallelism: 1;
+  };
+};
+
+export type Argon2Params = {
+  memoryCostKib: number;
+  iterations: number;
+  parallelism: number;
 };
 
 export type KemKeypair = { publicKey: Uint8Array; secretKey: Uint8Array };
@@ -206,6 +237,20 @@ export declare function labeledKdf32(
   ikm: Uint8Array,
 ): Uint8Array;
 
+/**
+ * Argon2id password → 32-byte key. Deliberately slow / memory-hard.
+ * Prefer PWHASH.RECOMMENDED_PARAMS unless you have measured otherwise.
+ */
+export declare function pwhashDeriveKey(
+  password: Uint8Array,
+  salt: Uint8Array,
+  params: Argon2Params,
+): Uint8Array;
+/** Cryptographically random 16-byte Argon2id salt. */
+export declare function generateSalt(): Uint8Array;
+/** Same values as PWHASH.RECOMMENDED_PARAMS (WASM mirror). */
+export declare function RECOMMENDED_PARAMS(): Argon2Params;
+
 /** CBOM attach point: usage from the last WASM primitive call, or undefined. */
 export declare function getLastUsageRecord(): CryptoUsageRecord | undefined;
 
@@ -234,6 +279,7 @@ export {
   HASH,
   KDF_LABEL_PREFIX,
   KEM,
+  PWHASH,
   SIG,
   isPairwiseConsistencyFailure,
   isSelfTestFailure,
@@ -261,6 +307,9 @@ export const kemGenerateKeypair = wasm.kemGenerateKeypair;
 export const kemKeypairFromSeed = wasm.kemKeypairFromSeed;
 export const labeledKdf = wasm.labeledKdf;
 export const labeledKdf32 = wasm.labeledKdf32;
+export const pwhashDeriveKey = wasm.pwhashDeriveKey;
+export const generateSalt = wasm.generateSalt;
+export const RECOMMENDED_PARAMS = wasm.RECOMMENDED_PARAMS;
 export const shake256 = wasm.shake256;
 export const sigExpandedSecretKey = wasm.sigExpandedSecretKey;
 export const sigGenerateKeypair = wasm.sigGenerateKeypair;
@@ -278,10 +327,15 @@ export async function runSelfTests() {
 `;
   }
 
-  return `${header}
-import {
+  if (targetName === "web") {
+    // wasm-pack --target web needs an async init before any export works.
+    // Browsers / Expo Metro should serve the .wasm from a known URL (e.g.
+    // /enclave_pqc_primitives_wasm_bg.wasm in Expo public/).
+    return `${header}
+import init, {
   aeadDecrypt,
   aeadEncrypt,
+  generateSalt,
   getLastUsageRecord,
   hashUtf8,
   kemDecapsulate,
@@ -292,6 +346,8 @@ import {
   kemKeypairFromSeed,
   labeledKdf,
   labeledKdf32,
+  pwhashDeriveKey,
+  RECOMMENDED_PARAMS,
   runSelfTests as runSelfTestsSync,
   shake256,
   sigExpandedSecretKey,
@@ -307,6 +363,7 @@ import {
 export {
   aeadDecrypt,
   aeadEncrypt,
+  generateSalt,
   getLastUsageRecord,
   hashUtf8,
   kemDecapsulate,
@@ -318,6 +375,93 @@ export {
   kemKeypairFromSeed,
   labeledKdf,
   labeledKdf32,
+  pwhashDeriveKey,
+  RECOMMENDED_PARAMS,
+  shake256,
+  sigExpandedSecretKey,
+  sigGenerateKeypair,
+  sigKeypairFromSeed,
+  sigSign,
+  sigSignWithContext,
+  sigVerify,
+  sigVerifyWithContext,
+  zeroize,
+};
+
+let readyPromise;
+
+/**
+ * Initialize the WASM module once.
+ * @param {string | URL | Request | undefined} moduleOrPath
+ */
+export async function ensureWasm(moduleOrPath) {
+  if (!readyPromise) {
+    const path =
+      moduleOrPath ??
+      (typeof window !== "undefined"
+        ? "/enclave_pqc_primitives_wasm_bg.wasm"
+        : undefined);
+    readyPromise = init(
+      path !== undefined ? { module_or_path: path } : undefined,
+    );
+  }
+  await readyPromise;
+}
+
+/** Run CAST self-tests; throws SelfTestFailureError on failure. */
+export async function runSelfTests(moduleOrPath) {
+  await ensureWasm(moduleOrPath);
+  runSelfTestsSync();
+}
+`;
+  }
+
+  return `${header}
+import {
+  aeadDecrypt,
+  aeadEncrypt,
+  generateSalt,
+  getLastUsageRecord,
+  hashUtf8,
+  kemDecapsulate,
+  kemEncapsulate,
+  kemEncapsulateDeterministic,
+  kemExpandedSecretKey,
+  kemGenerateKeypair,
+  kemKeypairFromSeed,
+  labeledKdf,
+  labeledKdf32,
+  pwhashDeriveKey,
+  RECOMMENDED_PARAMS,
+  runSelfTests as runSelfTestsSync,
+  shake256,
+  sigExpandedSecretKey,
+  sigGenerateKeypair,
+  sigKeypairFromSeed,
+  sigSign,
+  sigSignWithContext,
+  sigVerify,
+  sigVerifyWithContext,
+  zeroize,
+} from "./enclave_pqc_primitives_wasm.js";
+
+export {
+  aeadDecrypt,
+  aeadEncrypt,
+  generateSalt,
+  getLastUsageRecord,
+  hashUtf8,
+  kemDecapsulate,
+  kemEncapsulate,
+  /** Hazmat — KATs only. Prefer kemEncapsulate in production. */
+  kemEncapsulateDeterministic,
+  kemExpandedSecretKey,
+  kemGenerateKeypair,
+  kemKeypairFromSeed,
+  labeledKdf,
+  labeledKdf32,
+  pwhashDeriveKey,
+  RECOMMENDED_PARAMS,
   shake256,
   sigExpandedSecretKey,
   sigGenerateKeypair,
@@ -372,6 +516,23 @@ for (const target of targets) {
       join(target.out, "enclave_pqc_primitives_wasm.js"),
       join(target.out, "enclave_pqc_primitives_wasm.cjs"),
     );
+  }
+
+  if (target.name === "web") {
+    // Metro / classic script tags cannot parse import.meta. Pin WASM to
+    // the site-root path Expo serves from /public.
+    const gluePath = join(target.out, "enclave_pqc_primitives_wasm.js");
+    const glue = readFileSync(gluePath, "utf8");
+    const patched = glue.replace(
+      /module_or_path\s*=\s*new URL\([^)]*import\.meta\.url\);/,
+      "module_or_path = '/enclave_pqc_primitives_wasm_bg.wasm';",
+    );
+    if (patched === glue) {
+      throw new Error(
+        "web wasm glue: expected import.meta URL for wasm path; pattern missing",
+      );
+    }
+    writeFileSync(gluePath, patched);
   }
 }
 

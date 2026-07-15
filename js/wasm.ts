@@ -7,6 +7,7 @@
 export {
   aeadDecrypt,
   aeadEncrypt,
+  generateSalt,
   getLastUsageRecord,
   hashUtf8,
   kemDecapsulate,
@@ -17,6 +18,8 @@ export {
   kemKeypairFromSeed,
   labeledKdf,
   labeledKdf32,
+  pwhashDeriveKey,
+  RECOMMENDED_PARAMS,
   runSelfTests,
   shake256,
   sigExpandedSecretKey,

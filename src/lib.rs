@@ -15,9 +15,12 @@
 //! | Signatures | ML-DSA-87 | FIPS 204 |
 //! | Symmetric AEAD | AES-256-GCM | FIPS 197 / SP 800-38D |
 //! | Hash / KDF | SHAKE256 / `enclave-kdf-v1` | FIPS 202 |
+//! | Password → key | Argon2id | RFC 9106 (classical) |
 //!
-//! Classical-only algorithms (RSA, ECDSA/ECDH, AES-128, X25519, Ed25519) are
-//! **out of scope** and must not be added here.
+//! Classical public-key algorithms (RSA, ECDSA/ECDH, X25519, Ed25519) and
+//! AES-128 remain **out of scope**. Argon2id is the deliberate exception: it
+//! is classical memory-hard password hashing needed for human secrets, and is
+//! **not** part of the Category 5 / CNSA 2.0 suite story.
 //!
 //! # Modules
 //!
@@ -25,7 +28,8 @@
 //! - [`sig`] — ML-DSA-87 signatures
 //! - [`aead`] — AES-256-GCM with explicit nonces
 //! - [`hash`] — SHAKE256 one-shot and XOF
-//! - [`kdf`] — labeled `enclave-kdf-v1` KDF
+//! - [`kdf`] — labeled `enclave-kdf-v1` KDF (high-entropy IKM)
+//! - [`pwhash`] — Argon2id password → key (low-entropy passwords)
 //! - [`provider`] — [`CryptoProvider`] seam + [`SoftwareProvider`]
 //! - [`self_test`] — CAST known-answer self-tests
 //! - [`usage`] — CBOM-oriented [`CryptoUsageRecord`]
@@ -40,6 +44,7 @@ pub mod hash;
 pub mod kdf;
 pub mod kem;
 pub mod provider;
+pub mod pwhash;
 pub mod self_test;
 pub mod sig;
 pub mod usage;

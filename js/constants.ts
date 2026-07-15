@@ -50,6 +50,32 @@ export const HASH = {
   DEFAULT_OUTPUT_BYTES: 32,
 } as const;
 
+/**
+ * Argon2id password → key (classical, memory-hard).
+ *
+ * Distinct from `enclave-kdf-v1` (high-entropy IKM). Slow is intentional —
+ * do not lower RECOMMENDED_PARAMS for login latency without a security review.
+ *
+ * OWASP Password Storage Cheat Sheet baseline verified 2026-07-14:
+ * m=19456 (19 MiB), t=2, p=1.
+ */
+export const PWHASH = {
+  ALGORITHM: "Argon2id",
+  SALT_BYTES: 16,
+  OUTPUT_BYTES: 32,
+  RECOMMENDED_PARAMS: {
+    memoryCostKib: 19456,
+    iterations: 2,
+    parallelism: 1,
+  },
+} as const;
+
+export type Argon2Params = {
+  memoryCostKib: number;
+  iterations: number;
+  parallelism: number;
+};
+
 export type KemKeypair = {
   publicKey: Uint8Array;
   secretKey: Uint8Array;

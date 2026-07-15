@@ -1,11 +1,11 @@
 //! Generic wasm-bindgen façade over `enclave-pqc-primitives`.
 //!
-//! Namespaced by **algorithm** only (`kem` / `sig` / `aead` / `hash` / `kdf`).
-//! Product concepts (sessions, envelopes, tokens, credentials) must not appear
-//! here — they belong in product SDKs that consume this package.
+//! Namespaced by **algorithm** only (`kem` / `sig` / `aead` / `hash` / `kdf` /
+//! `pwhash`). Product concepts (sessions, envelopes, tokens, credentials) must
+//! not appear here — they belong in product SDKs that consume this package.
 //!
-//! Implements NIST Category 5 exclusively (ML-KEM-1024 / ML-DSA-87). There is
-//! no suite-selection parameter.
+//! Implements NIST Category 5 exclusively (ML-KEM-1024 / ML-DSA-87). Argon2id
+//! is exposed as a classical password → key primitive alongside that suite.
 
 #![deny(missing_docs)]
 #![allow(non_snake_case)]
@@ -15,6 +15,7 @@ mod error;
 mod hash;
 mod kdf;
 mod kem;
+mod pwhash;
 mod self_test;
 mod sig;
 mod usage;
@@ -23,6 +24,7 @@ pub use aead::*;
 pub use hash::*;
 pub use kdf::*;
 pub use kem::*;
+pub use pwhash::*;
 pub use self_test::*;
 pub use sig::*;
 pub use usage::*;
