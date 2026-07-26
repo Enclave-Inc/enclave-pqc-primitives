@@ -16,6 +16,8 @@ description = "NIST-aligned post-quantum cryptographic primitives for Enclave SD
 license.workspace = true
 readme = "README.md"
 repository = "https://github.com/Enclave-Inc/enclave-pqc-primitives"
+documentation = "https://github.com/Enclave-Inc/enclave-pqc-primitives"
+authors = ["Enclave Technologies Inc."]
 keywords = ["post-quantum", "ml-kem", "ml-dsa", "cryptography", "fips"]
 categories = ["cryptography"]
 
