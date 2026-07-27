@@ -8,7 +8,7 @@ const nodeDist = path.join(root, "dist", "nodejs", "index.js");
 export default defineConfig({
   resolve: {
     alias: {
-      "@enclave/pqc-primitives": nodeDist,
+      "@enclave-technologies/pqc-primitives": nodeDist,
     },
   },
   server: {

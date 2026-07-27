@@ -1,5 +1,5 @@
 /**
- * @enclave/pqc-primitives — JS facade over the WASM binding.
+ * @enclave-technologies/pqc-primitives — JS facade over the WASM binding.
  *
  * Algorithm-namespaced only. Product SDKs must not push session/envelope/token
  * logic into this package.

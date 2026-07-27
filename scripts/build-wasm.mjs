@@ -266,7 +266,7 @@ export declare function zeroize(buf: Uint8Array): void;
 
 function indexJs(targetName) {
   const header = `/**
- * @enclave/pqc-primitives — algorithm-only façade (${targetName}).
+ * @enclave-technologies/pqc-primitives — algorithm-only façade (${targetName}).
  *
  * Category 5 exclusively (ML-KEM-1024 / ML-DSA-87). No suite parameter.
  *

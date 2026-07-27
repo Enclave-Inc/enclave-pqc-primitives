@@ -1,5 +1,5 @@
 /**
- * Algorithm suite sizes for @enclave/pqc-primitives.
+ * Algorithm suite sizes for @enclave-technologies/pqc-primitives.
  * Values MUST match the Rust crate constants (ENCLAVE_PQ_SUITE_v1, Category 5).
  *
  * Keygen returns the preferred *seed* secret-key form

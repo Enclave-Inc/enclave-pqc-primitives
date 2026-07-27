@@ -1,6 +1,6 @@
 //! Labeled KDF: `enclave-kdf-v1` (SHAKE256 domain-separated).
 //!
-//! Matches the TypeScript `@enclave/pqc-primitives` construction so Rust and JS
+//! Matches the TypeScript `@enclave-technologies/pqc-primitives` construction so Rust and JS
 //! SDKs derive identical key material from the same inputs.
 
 use crate::hash::shake256_raw;

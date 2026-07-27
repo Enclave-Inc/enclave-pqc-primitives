@@ -28,9 +28,9 @@ import {
   sigVerify,
   sigVerifyWithContext,
   zeroize,
-} from "@enclave/pqc-primitives";
+} from "@enclave-technologies/pqc-primitives";
 
-describe("@enclave/pqc-primitives wasm bindings (Category 5)", () => {
+describe("@enclave-technologies/pqc-primitives wasm bindings (Category 5)", () => {
   it("exports Category 5 suite size constants", () => {
     expect(KEM.ALGORITHM).toBe("ML-KEM-1024");
     expect(KEM.PUBLIC_KEY_BYTES).toBe(1568);

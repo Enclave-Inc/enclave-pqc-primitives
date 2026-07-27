@@ -4,7 +4,7 @@ NIST-aligned **post-quantum cryptographic primitives** for Enclave product
 SDKs. Licensed under **Apache-2.0**.
 
 This is the foundational (tier-1) crate **and** the npm package
-`@enclave/pqc-primitives` (WASM bindings). Product SDKs (Auth, Sign, Verify,
+`@enclave-technologies/pqc-primitives` (WASM bindings). Product SDKs (Auth, Sign, Verify,
 Messaging, …) build **on top of** it. This package stays **algorithm-only** —
 no sessions, envelopes, tokens, or credentials.
 
@@ -86,7 +86,7 @@ Each operation returns a [`CryptoUsageRecord`] (`algorithm`, `suite_id`,
 `operation`, `crate_version`) for CBOM / audit attach points. Persistence and
 telemetry belong in Encrypt / product layers — not this crate.
 
-## JavaScript / TypeScript (`@enclave/pqc-primitives`)
+## JavaScript / TypeScript (`@enclave-technologies/pqc-primitives`)
 
 WASM façade over the same Category 5 Rust core. Algorithm-namespaced only
 (`kem*` / `sig*` / `aead*` / …) — no product concepts.
@@ -104,7 +104,7 @@ npm test
 
 | Consumer | Import condition / path |
 |----------|-------------------------|
-| Node / Vitest | `import … from "@enclave/pqc-primitives"` → `dist/nodejs` |
+| Node / Vitest | `import … from "@enclave-technologies/pqc-primitives"` → `dist/nodejs` |
 | Next.js / webpack / Vite | `"browser"` → `dist/bundler` |
 | Deno / raw ESM | `"./web"` or `"deno"` → `dist/web` |
 
@@ -118,7 +118,7 @@ import {
   pwhashDeriveKey, generateSalt, RECOMMENDED_PARAMS,
   runSelfTests, getLastUsageRecord,
   isPairwiseConsistencyFailure, isSelfTestFailure,
-} from "@enclave/pqc-primitives";
+} from "@enclave-technologies/pqc-primitives";
 
 await runSelfTests();
 const kp = kemGenerateKeypair(); // PCT inside; seed-form secretKey (64 B)

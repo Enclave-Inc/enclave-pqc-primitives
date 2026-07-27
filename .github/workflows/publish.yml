@@ -1,4 +1,4 @@
-# Publish @enclave/pqc-primitives (npm) and enclave-pqc-primitives (crates.io).
+# Publish @enclave-technologies/pqc-primitives (npm) and enclave-pqc-primitives (crates.io).
 # Create a GitHub Release with a tag matching package.json / Cargo.toml version
 # (e.g. v0.1.0) to trigger both publishes.
 #
