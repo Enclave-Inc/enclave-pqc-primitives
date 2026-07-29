@@ -1,6 +1,6 @@
 {
   "name": "@enclave-technologies/pqc-primitives",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "NIST Category 5 post-quantum primitives (ML-KEM-1024, ML-DSA-87, AES-256-GCM, SHAKE256) via WASM — algorithm API only",
   "license": "Apache-2.0",
   "type": "module",
