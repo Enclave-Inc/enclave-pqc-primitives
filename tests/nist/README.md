@@ -1,13 +1,19 @@
-# NIST fixtures
+# NIST ACVP fixtures (Category 3)
 
-Category 3 (ML-KEM-768 / ML-DSA-65) ACVP fixtures were removed when this crate
-cut over to Category 5 exclusively.
+Official Known-Answer Test vectors for **ML-KEM-768** and **ML-DSA-65**, vendored
+from [usnistgov/ACVP-Server](https://github.com/usnistgov/ACVP-Server)
+`gen-val/json-files/`:
 
-AES-256-GCM and SHAKE256 known-answer coverage lives in
-`tests/nist_symmetric_hash_kdf.rs`.
+| File | Upstream | Cases |
+|------|----------|-------|
+| `ml_kem_768_keygen.json` | `ML-KEM-keyGen-FIPS203` | 25 |
+| `ml_kem_768_encapsulation.json` | `ML-KEM-encapDecap-FIPS203` | 25 |
+| `ml_kem_768_decapsulation.json` | `ML-KEM-encapDecap-FIPS203` | 10 |
+| `ml_dsa_65_keygen.json` | `ML-DSA-keyGen-FIPS204` | 25 |
+| `ml_dsa_65_siggen_deterministic_external_pure.json` | `ML-DSA-sigGen-FIPS204` | 15 |
+| `ml_dsa_65_sigver_external_pure.json` | `ML-DSA-sigVer-FIPS204` | 15 |
 
-ML-KEM-1024 / ML-DSA-87 known-answer CAST coverage (fixed seeds + digests) lives
-in `src/self_test.rs` and is exercised by `run_self_tests()` / `tests/roundtrip.rs`.
+Harness: `tests/nist_ml_kem_768.rs`, `tests/nist_ml_dsa_65.rs`.
 
-Official NIST ACVP Category 5 vectors may be added here later under names that
-do not imply Category 3.
+Category 5 CAST coverage (internal golden digests) lives in `src/self_test.rs`.
+AES-256-GCM and SHAKE256 KATs live in `tests/nist_symmetric_hash_kdf.rs`.

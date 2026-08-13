@@ -4,7 +4,7 @@
  * Algorithm-namespaced only. Product SDKs must not push session/envelope/token
  * logic into this package.
  *
- * Category 5 exclusively (ML-KEM-1024 / ML-DSA-87). No suite parameter.
+ * Category 5 (ML-KEM-1024 / ML-DSA-87) and Category 3 (ML-KEM-768 / ML-DSA-65).
  * Argon2id (`pwhash*`) is the classical password → key companion primitive.
  *
  * # Secret zeroization
@@ -20,8 +20,10 @@ export {
   HASH,
   KDF_LABEL_PREFIX,
   KEM,
+  KEM768,
   PWHASH,
   SIG,
+  SIG65,
   isPairwiseConsistencyFailure,
   isSelfTestFailure,
   type Argon2Params,
@@ -47,6 +49,12 @@ export {
   kemExpandedSecretKey,
   kemGenerateKeypair,
   kemKeypairFromSeed,
+  kem768Decapsulate,
+  kem768Encapsulate,
+  kem768EncapsulateDeterministic,
+  kem768ExpandedSecretKey,
+  kem768GenerateKeypair,
+  kem768KeypairFromSeed,
   labeledKdf,
   labeledKdf32,
   pwhashDeriveKey,
@@ -60,5 +68,12 @@ export {
   sigSignWithContext,
   sigVerify,
   sigVerifyWithContext,
+  sig65ExpandedSecretKey,
+  sig65GenerateKeypair,
+  sig65KeypairFromSeed,
+  sig65Sign,
+  sig65SignWithContext,
+  sig65Verify,
+  sig65VerifyWithContext,
   zeroize,
 } from "./wasm.js";

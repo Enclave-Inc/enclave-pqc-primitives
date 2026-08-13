@@ -13,6 +13,29 @@ export const ENCLAVE_PQ_SUITE_ID = "ENCLAVE_PQ_SUITE_v1" as const;
 /** Domain-separation prefix for `labeledKdf` / `enclave-kdf-v1`. */
 export const KDF_LABEL_PREFIX = "enclave-kdf-v1" as const;
 
+/** ML-KEM-768 sizes (FIPS 203, NIST Category 3). */
+export const KEM768 = {
+  ALGORITHM: "ML-KEM-768",
+  PUBLIC_KEY_BYTES: 1184,
+  SECRET_KEY_SEED_BYTES: 64,
+  SECRET_KEY_EXPANDED_BYTES: 2400,
+  SECRET_KEY_BYTES: 2400,
+  CIPHERTEXT_BYTES: 1088,
+  SHARED_SECRET_BYTES: 32,
+  ENCAP_RANDOMNESS_BYTES: 32,
+} as const;
+
+/** ML-DSA-65 sizes (FIPS 204, NIST Category 3). */
+export const SIG65 = {
+  ALGORITHM: "ML-DSA-65",
+  PUBLIC_KEY_BYTES: 1952,
+  SECRET_KEY_SEED_BYTES: 32,
+  SECRET_KEY_EXPANDED_BYTES: 4032,
+  SECRET_KEY_BYTES: 4032,
+  SIGNATURE_BYTES: 3309,
+  MAX_CONTEXT_BYTES: 255,
+} as const;
+
 /** ML-KEM-1024 sizes (FIPS 203, NIST Category 5). */
 export const KEM = {
   ALGORITHM: "ML-KEM-1024",

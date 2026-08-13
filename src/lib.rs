@@ -1,4 +1,4 @@
-//! `enclave-pqc-primitives` — NIST Category 5 post-quantum primitives.
+//! `enclave-pqc-primitives` — NIST post-quantum primitives (Category 3 + 5).
 //!
 //! Foundational cryptography for Enclave product SDKs (Auth, Sign, Verify,
 //! Messaging, Encrypt). This crate deliberately contains **primitives only** —
@@ -6,13 +6,15 @@
 //!
 //! # Algorithm suite (`ENCLAVE_PQ_SUITE_v1`)
 //!
-//! This crate implements **NIST Category 5 exclusively** (ML-KEM-1024 /
-//! ML-DSA-87). There is no Category 3 parameter set and no suite-selection API.
+//! Category 5 (ML-KEM-1024 / ML-DSA-87) via [`kem`] / [`sig`].
+//! Category 3 (ML-KEM-768 / ML-DSA-65) via [`kem768`] / [`sig65`].
 //!
 //! | Role | Algorithm | Standard |
 //! |------|-----------|----------|
-//! | KEM | ML-KEM-1024 | FIPS 203 |
-//! | Signatures | ML-DSA-87 | FIPS 204 |
+//! | KEM (Cat 5) | ML-KEM-1024 | FIPS 203 |
+//! | KEM (Cat 3) | ML-KEM-768 | FIPS 203 |
+//! | Signatures (Cat 5) | ML-DSA-87 | FIPS 204 |
+//! | Signatures (Cat 3) | ML-DSA-65 | FIPS 204 |
 //! | Symmetric AEAD | AES-256-GCM | FIPS 197 / SP 800-38D |
 //! | Hash / KDF | SHAKE256 / `enclave-kdf-v1` | FIPS 202 |
 //! | Password → key | Argon2id | RFC 9106 (classical) |
@@ -24,8 +26,10 @@
 //!
 //! # Modules
 //!
-//! - [`kem`] — ML-KEM-1024 key encapsulation
-//! - [`sig`] — ML-DSA-87 signatures
+//! - [`kem`] — ML-KEM-1024 key encapsulation (Category 5)
+//! - [`kem768`] — ML-KEM-768 key encapsulation (Category 3)
+//! - [`sig`] — ML-DSA-87 signatures (Category 5)
+//! - [`sig65`] — ML-DSA-65 signatures (Category 3)
 //! - [`aead`] — AES-256-GCM with explicit nonces
 //! - [`hash`] — SHAKE256 one-shot and XOF
 //! - [`kdf`] — labeled `enclave-kdf-v1` KDF (high-entropy IKM)
@@ -43,10 +47,12 @@ pub mod error;
 pub mod hash;
 pub mod kdf;
 pub mod kem;
+pub mod kem768;
 pub mod provider;
 pub mod pwhash;
 pub mod self_test;
 pub mod sig;
+pub mod sig65;
 pub mod usage;
 
 pub use error::{Error, Result, SelfTestError};

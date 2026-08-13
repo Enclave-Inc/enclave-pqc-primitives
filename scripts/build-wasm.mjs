@@ -108,6 +108,25 @@ export function isSelfTestFailure(err) {
 const INDEX_DTS = `/** Category 5 sizes — must match Rust ENCLAVE_PQ_SUITE_v1. */
 export declare const ENCLAVE_PQ_SUITE_ID: "ENCLAVE_PQ_SUITE_v1";
 export declare const KDF_LABEL_PREFIX: "enclave-kdf-v1";
+export declare const KEM768: {
+  readonly ALGORITHM: "ML-KEM-768";
+  readonly PUBLIC_KEY_BYTES: 1184;
+  readonly SECRET_KEY_SEED_BYTES: 64;
+  readonly SECRET_KEY_EXPANDED_BYTES: 2400;
+  readonly SECRET_KEY_BYTES: 2400;
+  readonly CIPHERTEXT_BYTES: 1088;
+  readonly SHARED_SECRET_BYTES: 32;
+  readonly ENCAP_RANDOMNESS_BYTES: 32;
+};
+export declare const SIG65: {
+  readonly ALGORITHM: "ML-DSA-65";
+  readonly PUBLIC_KEY_BYTES: 1952;
+  readonly SECRET_KEY_SEED_BYTES: 32;
+  readonly SECRET_KEY_EXPANDED_BYTES: 4032;
+  readonly SECRET_KEY_BYTES: 4032;
+  readonly SIGNATURE_BYTES: 3309;
+  readonly MAX_CONTEXT_BYTES: 255;
+};
 export declare const KEM: {
   readonly ALGORITHM: "ML-KEM-1024";
   readonly PUBLIC_KEY_BYTES: 1568;
@@ -208,6 +227,44 @@ export declare function sigVerifyWithContext(
   context: Uint8Array,
 ): boolean;
 
+export declare function kem768GenerateKeypair(): KemKeypair;
+export declare function kem768KeypairFromSeed(seed: Uint8Array): KemKeypair;
+export declare function kem768ExpandedSecretKey(secretKey: Uint8Array): Uint8Array;
+export declare function kem768Encapsulate(publicKey: Uint8Array): KemEncapsulation;
+/** Hazmat — KATs only. Prefer kem768Encapsulate. */
+export declare function kem768EncapsulateDeterministic(
+  publicKey: Uint8Array,
+  m: Uint8Array,
+): KemEncapsulation;
+export declare function kem768Decapsulate(
+  ciphertext: Uint8Array,
+  secretKey: Uint8Array,
+): Uint8Array;
+
+export declare function sig65GenerateKeypair(): SigKeypair;
+export declare function sig65KeypairFromSeed(seed: Uint8Array): SigKeypair;
+export declare function sig65ExpandedSecretKey(secretKey: Uint8Array): Uint8Array;
+export declare function sig65Sign(
+  secretKey: Uint8Array,
+  message: Uint8Array,
+): Uint8Array;
+export declare function sig65SignWithContext(
+  secretKey: Uint8Array,
+  message: Uint8Array,
+  context: Uint8Array,
+): Uint8Array;
+export declare function sig65Verify(
+  publicKey: Uint8Array,
+  message: Uint8Array,
+  signature: Uint8Array,
+): boolean;
+export declare function sig65VerifyWithContext(
+  publicKey: Uint8Array,
+  message: Uint8Array,
+  signature: Uint8Array,
+  context: Uint8Array,
+): boolean;
+
 export declare function aeadEncrypt(
   key: Uint8Array,
   nonce: Uint8Array,
@@ -268,7 +325,7 @@ function indexJs(targetName) {
   const header = `/**
  * @enclave-technologies/pqc-primitives — algorithm-only façade (${targetName}).
  *
- * Category 5 exclusively (ML-KEM-1024 / ML-DSA-87). No suite parameter.
+ * Category 5 (ML-KEM-1024 / ML-DSA-87) and Category 3 (ML-KEM-768 / ML-DSA-65).
  *
  * Secret zeroization does NOT cross the WASM boundary. Call zeroize(buf) on
  * long-lived secret Uint8Arrays when finished.
@@ -279,8 +336,10 @@ export {
   HASH,
   KDF_LABEL_PREFIX,
   KEM,
+  KEM768,
   PWHASH,
   SIG,
+  SIG65,
   isPairwiseConsistencyFailure,
   isSelfTestFailure,
 } from "./constants.js";
@@ -318,6 +377,19 @@ export const sigSign = wasm.sigSign;
 export const sigSignWithContext = wasm.sigSignWithContext;
 export const sigVerify = wasm.sigVerify;
 export const sigVerifyWithContext = wasm.sigVerifyWithContext;
+export const kem768Decapsulate = wasm.kem768Decapsulate;
+export const kem768Encapsulate = wasm.kem768Encapsulate;
+export const kem768EncapsulateDeterministic = wasm.kem768EncapsulateDeterministic;
+export const kem768ExpandedSecretKey = wasm.kem768ExpandedSecretKey;
+export const kem768GenerateKeypair = wasm.kem768GenerateKeypair;
+export const kem768KeypairFromSeed = wasm.kem768KeypairFromSeed;
+export const sig65ExpandedSecretKey = wasm.sig65ExpandedSecretKey;
+export const sig65GenerateKeypair = wasm.sig65GenerateKeypair;
+export const sig65KeypairFromSeed = wasm.sig65KeypairFromSeed;
+export const sig65Sign = wasm.sig65Sign;
+export const sig65SignWithContext = wasm.sig65SignWithContext;
+export const sig65Verify = wasm.sig65Verify;
+export const sig65VerifyWithContext = wasm.sig65VerifyWithContext;
 export const zeroize = wasm.zeroize;
 
 /** Run CAST self-tests; throws SelfTestFailureError on failure. */
@@ -344,6 +416,12 @@ import init, {
   kemExpandedSecretKey,
   kemGenerateKeypair,
   kemKeypairFromSeed,
+  kem768Decapsulate,
+  kem768Encapsulate,
+  kem768EncapsulateDeterministic,
+  kem768ExpandedSecretKey,
+  kem768GenerateKeypair,
+  kem768KeypairFromSeed,
   labeledKdf,
   labeledKdf32,
   pwhashDeriveKey,
@@ -357,6 +435,13 @@ import init, {
   sigSignWithContext,
   sigVerify,
   sigVerifyWithContext,
+  sig65ExpandedSecretKey,
+  sig65GenerateKeypair,
+  sig65KeypairFromSeed,
+  sig65Sign,
+  sig65SignWithContext,
+  sig65Verify,
+  sig65VerifyWithContext,
   zeroize,
 } from "./enclave_pqc_primitives_wasm.js";
 
@@ -373,6 +458,12 @@ export {
   kemExpandedSecretKey,
   kemGenerateKeypair,
   kemKeypairFromSeed,
+  kem768Decapsulate,
+  kem768Encapsulate,
+  kem768EncapsulateDeterministic,
+  kem768ExpandedSecretKey,
+  kem768GenerateKeypair,
+  kem768KeypairFromSeed,
   labeledKdf,
   labeledKdf32,
   pwhashDeriveKey,
@@ -385,6 +476,13 @@ export {
   sigSignWithContext,
   sigVerify,
   sigVerifyWithContext,
+  sig65ExpandedSecretKey,
+  sig65GenerateKeypair,
+  sig65KeypairFromSeed,
+  sig65Sign,
+  sig65SignWithContext,
+  sig65Verify,
+  sig65VerifyWithContext,
   zeroize,
 };
 
@@ -429,6 +527,12 @@ import {
   kemExpandedSecretKey,
   kemGenerateKeypair,
   kemKeypairFromSeed,
+  kem768Decapsulate,
+  kem768Encapsulate,
+  kem768EncapsulateDeterministic,
+  kem768ExpandedSecretKey,
+  kem768GenerateKeypair,
+  kem768KeypairFromSeed,
   labeledKdf,
   labeledKdf32,
   pwhashDeriveKey,
@@ -442,6 +546,13 @@ import {
   sigSignWithContext,
   sigVerify,
   sigVerifyWithContext,
+  sig65ExpandedSecretKey,
+  sig65GenerateKeypair,
+  sig65KeypairFromSeed,
+  sig65Sign,
+  sig65SignWithContext,
+  sig65Verify,
+  sig65VerifyWithContext,
   zeroize,
 } from "./enclave_pqc_primitives_wasm.js";
 
@@ -458,6 +569,12 @@ export {
   kemExpandedSecretKey,
   kemGenerateKeypair,
   kemKeypairFromSeed,
+  kem768Decapsulate,
+  kem768Encapsulate,
+  kem768EncapsulateDeterministic,
+  kem768ExpandedSecretKey,
+  kem768GenerateKeypair,
+  kem768KeypairFromSeed,
   labeledKdf,
   labeledKdf32,
   pwhashDeriveKey,
@@ -470,6 +587,13 @@ export {
   sigSignWithContext,
   sigVerify,
   sigVerifyWithContext,
+  sig65ExpandedSecretKey,
+  sig65GenerateKeypair,
+  sig65KeypairFromSeed,
+  sig65Sign,
+  sig65SignWithContext,
+  sig65Verify,
+  sig65VerifyWithContext,
   zeroize,
 };
 

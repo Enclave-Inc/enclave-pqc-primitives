@@ -15,18 +15,22 @@ mod error;
 mod hash;
 mod kdf;
 mod kem;
+mod kem768;
 mod pwhash;
 mod self_test;
 mod sig;
+mod sig65;
 mod usage;
 
 pub use aead::*;
 pub use hash::*;
 pub use kdf::*;
 pub use kem::*;
+pub use kem768::*;
 pub use pwhash::*;
 pub use self_test::*;
 pub use sig::*;
+pub use sig65::*;
 pub use usage::*;
 
 use wasm_bindgen::prelude::*;
