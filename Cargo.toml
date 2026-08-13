@@ -9,7 +9,7 @@ rust-version = "1.85"
 
 [package]
 name = "enclave-pqc-primitives"
-version = "0.1.1"
+version = "0.1.2"
 edition.workspace = true
 rust-version.workspace = true
 description = "NIST-aligned post-quantum cryptographic primitives for Enclave SDKs"
