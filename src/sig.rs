@@ -174,11 +174,7 @@ pub fn sign_deterministic(secret_key: &[u8], message: &[u8], context: &[u8]) -> 
     })
 }
 
-pub(crate) fn sign_unchecked(
-    secret_key: &[u8],
-    message: &[u8],
-    context: &[u8],
-) -> Result<Vec<u8>> {
+pub(crate) fn sign_unchecked(secret_key: &[u8], message: &[u8], context: &[u8]) -> Result<Vec<u8>> {
     if message.is_empty() {
         return Err(Error::InvalidLength);
     }

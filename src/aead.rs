@@ -127,12 +127,7 @@ pub fn encrypt(key: &[u8], nonce: &[u8], plaintext: &[u8], aad: &[u8]) -> Result
 /// # Errors
 ///
 /// Returns [`Error::InvalidLength`] or [`Error::AeadFailure`].
-pub fn decrypt(
-    key: &[u8],
-    nonce: &[u8],
-    ciphertext: &[u8],
-    aad: &[u8],
-) -> Result<DecryptOutput> {
+pub fn decrypt(key: &[u8], nonce: &[u8], ciphertext: &[u8], aad: &[u8]) -> Result<DecryptOutput> {
     if ciphertext.len() < TAG_BYTES {
         return Err(Error::InvalidLength);
     }

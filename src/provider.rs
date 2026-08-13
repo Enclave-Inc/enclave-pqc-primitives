@@ -19,7 +19,9 @@
 use crate::aead;
 use crate::hash;
 use crate::kdf;
-use crate::kem::{self, DecapsulationOutput, EncapsulationOutput, KeypairOutput as KemKeypairOutput};
+use crate::kem::{
+    self, DecapsulationOutput, EncapsulationOutput, KeypairOutput as KemKeypairOutput,
+};
 use crate::sig::{self, KeypairOutput as SigKeypairOutput, SignOutput, VerifyOutput};
 use crate::usage::CryptoUsageRecord;
 use crate::Result;
@@ -36,11 +38,7 @@ pub trait CryptoProvider {
     fn kem_encapsulate(&self, public_key: &[u8]) -> Result<EncapsulationOutput>;
 
     /// Decapsulate an ML-KEM-1024 ciphertext.
-    fn kem_decapsulate(
-        &self,
-        ciphertext: &[u8],
-        secret_key: &[u8],
-    ) -> Result<DecapsulationOutput>;
+    fn kem_decapsulate(&self, ciphertext: &[u8], secret_key: &[u8]) -> Result<DecapsulationOutput>;
 
     /// Generate an ML-DSA-87 keypair (includes PCT).
     fn sig_generate_keypair(&self) -> Result<SigKeypairOutput>;
@@ -99,11 +97,7 @@ impl CryptoProvider for SoftwareProvider {
         kem::encapsulate(public_key)
     }
 
-    fn kem_decapsulate(
-        &self,
-        ciphertext: &[u8],
-        secret_key: &[u8],
-    ) -> Result<DecapsulationOutput> {
+    fn kem_decapsulate(&self, ciphertext: &[u8], secret_key: &[u8]) -> Result<DecapsulationOutput> {
         kem::decapsulate(ciphertext, secret_key)
     }
 

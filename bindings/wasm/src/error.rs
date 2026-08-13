@@ -24,9 +24,7 @@ pub(crate) fn js_error(err: Error) -> JsValue {
             "PairwiseConsistencyFailureError",
             &format!("PairwiseConsistencyFailure: {}", err.as_str()),
         ),
-        Error::InvalidLength => {
-            throw_named("Error", &format!("InvalidLength: {}", err.as_str()))
-        }
+        Error::InvalidLength => throw_named("Error", &format!("InvalidLength: {}", err.as_str())),
         Error::InvalidEncoding => {
             throw_named("Error", &format!("InvalidEncoding: {}", err.as_str()))
         }
@@ -42,10 +40,7 @@ pub(crate) fn js_error(err: Error) -> JsValue {
 
 /// Convert a [`SelfTestError`] into a thrown JS value.
 pub(crate) fn js_self_test_error(err: SelfTestError) -> JsValue {
-    throw_named(
-        "SelfTestFailureError",
-        &format!("SelfTestFailure: {err}"),
-    )
+    throw_named("SelfTestFailureError", &format!("SelfTestFailure: {err}"))
 }
 
 /// Throw a boundary check failure with a greppable prefix.

@@ -71,8 +71,7 @@ fn params_from_js(value: &JsValue) -> Result<Argon2Params, JsValue> {
     let parallelism = js_sys::Reflect::get(value, &JsValue::from_str("parallelism"))?
         .as_f64()
         .ok_or_else(|| js_error(enclave_pqc_primitives::Error::InvalidParameter))?;
-    if !(0.0..(f64::from(u32::MAX)))
-        .contains(&memory)
+    if !(0.0..(f64::from(u32::MAX))).contains(&memory)
         || !(0.0..(f64::from(u32::MAX))).contains(&iterations)
         || !(0.0..(f64::from(u32::MAX))).contains(&parallelism)
     {

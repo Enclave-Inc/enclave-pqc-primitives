@@ -19,7 +19,10 @@ fn nist_aes_256_gcm_empty_plaintext() {
     let key = unhex("0000000000000000000000000000000000000000000000000000000000000000");
     let nonce = unhex("000000000000000000000000");
     let sealed = aead::encrypt(&key, &nonce, b"", b"").expect("encrypt");
-    assert_eq!(sealed.result.ciphertext, unhex("530f8afbc74536b9a963b4f1c4cb738b"));
+    assert_eq!(
+        sealed.result.ciphertext,
+        unhex("530f8afbc74536b9a963b4f1c4cb738b")
+    );
     let pt = aead::decrypt(&key, &nonce, &sealed.result.ciphertext, b"").expect("decrypt");
     assert!(pt.plaintext.is_empty());
 }

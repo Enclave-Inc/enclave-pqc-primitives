@@ -33,9 +33,7 @@ impl Error {
             Self::AeadFailure => "AEAD authentication failed",
             Self::SignatureInvalid => "signature verification failed",
             Self::InvalidParameter => "invalid cryptographic parameter",
-            Self::PairwiseConsistencyFailure => {
-                "keypair failed pair-wise consistency test"
-            }
+            Self::PairwiseConsistencyFailure => "keypair failed pair-wise consistency test",
         }
     }
 }

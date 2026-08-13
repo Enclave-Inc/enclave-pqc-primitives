@@ -32,8 +32,8 @@ fn kem_aead_kdf_pipeline() {
     assert_eq!(enc.usage.algorithm, "ML-KEM-1024");
     assert_eq!(enc.usage.suite_id, ENCLAVE_PQ_SUITE_ID);
 
-    let key = kdf::labeled_kdf("aes-256-gcm-key", &shared.shared_secret, aead::KEY_BYTES)
-        .expect("kdf");
+    let key =
+        kdf::labeled_kdf("aes-256-gcm-key", &shared.shared_secret, aead::KEY_BYTES).expect("kdf");
     let nonce = {
         let digest = hash::shake256(b"test-nonce-context", aead::NONCE_BYTES);
         let mut n = [0u8; aead::NONCE_BYTES];
@@ -44,8 +44,7 @@ fn kem_aead_kdf_pipeline() {
     let plaintext = b"pipeline-plaintext";
     let aad = b"pipeline-aad";
     let sealed = aead::encrypt(&key.key, &nonce, plaintext, aad).expect("encrypt");
-    let opened =
-        aead::decrypt(&key.key, &nonce, &sealed.result.ciphertext, aad).expect("decrypt");
+    let opened = aead::decrypt(&key.key, &nonce, &sealed.result.ciphertext, aad).expect("decrypt");
     assert_eq!(opened.plaintext, plaintext);
 }
 

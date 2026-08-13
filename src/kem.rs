@@ -186,7 +186,10 @@ pub fn expanded_secret_key(secret_key: &[u8]) -> Result<(Vec<u8>, CryptoUsageRec
     #[allow(deprecated)]
     {
         use ml_kem::ExpandedKeyEncoding;
-        Ok((dk.to_expanded_bytes().to_vec(), usage("kem_expanded_secret_key")))
+        Ok((
+            dk.to_expanded_bytes().to_vec(),
+            usage("kem_expanded_secret_key"),
+        ))
     }
 }
 
