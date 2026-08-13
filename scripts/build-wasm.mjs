@@ -45,6 +45,27 @@ export const ENCLAVE_PQ_SUITE_ID = "ENCLAVE_PQ_SUITE_v1";
 /** @type {const} */
 export const KDF_LABEL_PREFIX = "enclave-kdf-v1";
 /** @type {const} */
+export const KEM768 = Object.freeze({
+  ALGORITHM: "ML-KEM-768",
+  PUBLIC_KEY_BYTES: 1184,
+  SECRET_KEY_SEED_BYTES: 64,
+  SECRET_KEY_EXPANDED_BYTES: 2400,
+  SECRET_KEY_BYTES: 2400,
+  CIPHERTEXT_BYTES: 1088,
+  SHARED_SECRET_BYTES: 32,
+  ENCAP_RANDOMNESS_BYTES: 32,
+});
+/** @type {const} */
+export const SIG65 = Object.freeze({
+  ALGORITHM: "ML-DSA-65",
+  PUBLIC_KEY_BYTES: 1952,
+  SECRET_KEY_SEED_BYTES: 32,
+  SECRET_KEY_EXPANDED_BYTES: 4032,
+  SECRET_KEY_BYTES: 4032,
+  SIGNATURE_BYTES: 3309,
+  MAX_CONTEXT_BYTES: 255,
+});
+/** @type {const} */
 export const KEM = Object.freeze({
   ALGORITHM: "ML-KEM-1024",
   PUBLIC_KEY_BYTES: 1568,
